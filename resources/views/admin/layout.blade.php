@@ -324,7 +324,7 @@
                                 <i class="fas fa-shield-alt text-white text-lg"></i>
                             </div>
                             <div class="sidebar-text">
-                                <h1 class="text-xl font-bold text-white">Admin Panel</h1>
+                            <h1 class="text-xl font-bold text-white">Admin Panel</h1>
                                 <p class="text-gray-400 text-xs mt-0.5">E-Commerce Management</p>
                             </div>
                         </div>
@@ -343,6 +343,14 @@
                     <a href="/admin/users" data-tooltip="User Management" class="nav-item {{ request()->is('admin/users') ? 'active' : '' }} flex items-center px-4 py-3 rounded-lg transition-all duration-300 {{ request()->is('admin/users') ? 'bg-gradient-to-r from-gray-700 to-gray-600 text-white shadow-lg' : 'text-gray-300 hover:bg-gray-700 hover:text-white hover:shadow-md' }}">
                         <i class="nav-item-icon fas fa-users w-5 text-center mr-3 text-lg"></i>
                         <span class="sidebar-text nav-item-text font-medium">User Management</span>
+                    </a>
+                    <a href="/admin/banners" data-tooltip="Banners" class="nav-item {{ request()->is('admin/banners') ? 'active' : '' }} flex items-center px-4 py-3 rounded-lg transition-all duration-300 {{ request()->is('admin/banners') ? 'bg-gradient-to-r from-gray-700 to-gray-600 text-white shadow-lg' : 'text-gray-300 hover:bg-gray-700 hover:text-white hover:shadow-md' }}">
+                        <i class="nav-item-icon fas fa-images w-5 text-center mr-3 text-lg"></i>
+                        <span class="sidebar-text nav-item-text font-medium">Banners</span>
+                    </a>
+                    <a href="/admin/vouchers" data-tooltip="Vouchers" class="nav-item {{ request()->is('admin/vouchers') ? 'active' : '' }} flex items-center px-4 py-3 rounded-lg transition-all duration-300 {{ request()->is('admin/vouchers') ? 'bg-gradient-to-r from-gray-700 to-gray-600 text-white shadow-lg' : 'text-gray-300 hover:bg-gray-700 hover:text-white hover:shadow-md' }}">
+                        <i class="nav-item-icon fas fa-ticket-alt w-5 text-center mr-3 text-lg"></i>
+                        <span class="sidebar-text nav-item-text font-medium">Vouchers</span>
                     </a>
                 </nav>
 
@@ -440,14 +448,20 @@
 
         async function fetchWithAuth(url, options = {}) {
             const token = localStorage.getItem('access_token');
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json',
+                ...options.headers
+            };
+
+            const isFormData = options.body instanceof FormData;
+            if (!isFormData && !headers['Content-Type']) {
+                headers['Content-Type'] = 'application/json';
+            }
+
             return fetch(`${apiBaseUrl}${url}`, {
                 ...options,
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    ...options.headers
-                }
+                headers
             });
         }
 

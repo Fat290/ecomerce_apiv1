@@ -73,4 +73,12 @@ class Product extends Model
     {
         return $this->hasMany(Review::class);
     }
+
+    /**
+     * Users who have wishlisted this product.
+     */
+    public function wishlists()
+    {
+        return $this->hasMany(Wishlist::class);
+    }
 }

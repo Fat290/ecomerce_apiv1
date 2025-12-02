@@ -18,7 +18,10 @@ class Shop extends Model
         'owner_id',
         'name',
         'logo',
+        'banner',
         'description',
+        'business_type',
+        'join_date',
         'address',
         'rating',
         'status',
@@ -49,6 +52,7 @@ class Shop extends Model
     {
         return [
             'rating' => 'decimal:2',
+            'join_date' => 'date',
         ];
     }
 

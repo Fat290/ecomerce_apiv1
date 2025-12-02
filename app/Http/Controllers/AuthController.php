@@ -10,7 +10,10 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
@@ -35,6 +38,8 @@ class AuthController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'phone' => $request->phone,
+            'avatar' => null,
+            'address' => null,
             'role' => $request->role ?? 'buyer',
             'status' => 'active', // Users are active by default when registering
         ]);
@@ -302,5 +307,83 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to logout from all devices', 500);
         }
+    }
+
+    /**
+     * Send a password reset code to the user's email.
+     */
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return $this->notFoundResponse('Email not found');
+        }
+
+        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $cacheKey = $this->passwordResetCacheKey($user->email);
+
+        Cache::put($cacheKey, $code, now()->addMinutes(10));
+
+        try {
+            Mail::raw(
+                "Your password reset code is {$code}. The code expires in 10 minutes.",
+                function ($message) use ($user) {
+                    $message->to($user->email)
+                        ->subject('Password Reset Code');
+                }
+            );
+        } catch (\Exception $e) {
+            Log::error('Failed to send password reset email: ' . $e->getMessage());
+        }
+
+        return $this->successResponse([
+            'code' => $code,
+            'expires_in' => 600,
+        ], 'Reset code sent to your email.');
+    }
+
+    /**
+     * Reset password after validating the code.
+     */
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => ['required', 'email'],
+            'code' => ['required', 'string', 'size:6'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return $this->notFoundResponse('Email not found');
+        }
+
+        $cacheKey = $this->passwordResetCacheKey($user->email);
+        $cachedCode = Cache::get($cacheKey);
+
+        if (!$cachedCode || $cachedCode !== $request->code) {
+            return $this->errorResponse('Invalid or expired code', 422);
+        }
+
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        Cache::forget($cacheKey);
+
+        return $this->successResponse(null, 'Password reset successfully.');
+    }
+
+    /**
+     * Helper to generate cache key for reset codes.
+     */
+    private function passwordResetCacheKey(string $email): string
+    {
+        return 'password_reset_code_' . sha1(strtolower($email));
     }
 }

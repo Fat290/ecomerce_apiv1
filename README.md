@@ -29,6 +29,147 @@ An e-commerce backend built on Laravel 12 that powers user accounts, shops, prod
 ---
 
 ## Overview
+- ## Database Schema Snapshot
+
+  The tables below list the columns and data types defined in the Laravel migrations. Use this as a quick reference when writing queries, seeders, or API payloads.
+
+  ### `users`
+  | Column | Type / Constraints | Notes |
+  |--------|--------------------|-------|
+  | `id` | big integer, PK |
+  | `role` | enum(`admin`,`seller`,`buyer`), default `user` | controls access level |
+  | `name` | string |
+  | `email` | string, unique |
+  | `email_verified_at` | timestamp, nullable |
+  | `password` | string |
+  | `phone` | string, nullable, unique |
+  | `avatar` | string, nullable |
+  | `status` | enum(`active`,`banned`,`pending`), default `active` |
+  | `address` | json, nullable |
+  | `remember_token` | string, nullable |
+  | Timestamps | `created_at`, `updated_at` |
+
+  ### `shops`
+  | Column | Type / Constraints | Notes |
+  |--------|--------------------|-------|
+  | `id` | big integer, PK |
+  | `owner_id` | FK → `users.id`, cascade delete |
+  | `name` | string |
+  | `logo` | string, nullable |
+  | `banner` | string, nullable |
+  | `description` | text, nullable |
+  | `business_type` | string, nullable |
+  | `join_date` | date, nullable |
+  | `address` | string, nullable |
+  | `rating` | decimal(3,2), default 0 |
+  | `status` | enum(`active`,`banned`,`pending`), default `pending` |
+  | Timestamps | `created_at`, `updated_at` |
+
+  ### `categories`
+  | Column | Type / Constraints | Notes |
+  |--------|--------------------|-------|
+  | `id` | big integer, PK |
+  | `name` | string |
+  | `parent_id` | self FK, nullable, cascade delete |
+  | Timestamps | `created_at`, `updated_at` |
+
+  ### `brands`
+  | Column | Type / Constraints | Notes |
+  |--------|--------------------|-------|
+  | `id` | big integer, PK |
+  | `name` | string |
+  | Timestamps | `created_at`, `updated_at` |
+
+  ### `products`
+  | Column | Type / Constraints | Notes |
+  |--------|--------------------|-------|
+  | `id` | big integer, PK |
+  | `shop_id` | FK → `shops.id`, cascade delete |
+  | `category_id` | FK → `categories.id`, cascade delete |
+  | `brand_id` | FK → `brands.id`, nullable, set null |
+  | `name` | string |
+  | `description` | text, nullable |
+  | `images` | json, nullable |
+  | `price` | decimal(10,2) |
+  | `stock` | integer, default 0 |
+  | `status` | enum(`draft`,`active`,`out_of_stock`,`hidden`,`archived`), default `draft` |
+  | `rating` | decimal(3,2), nullable, default 0 |
+  | `sold_count` | integer, default 0 |
+  | Timestamps | `created_at`, `updated_at` |
+
+  ### `vouchers`
+  | Column | Type / Constraints | Notes |
+  |--------|--------------------|-------|
+  | `id` | big integer, PK |
+  | `code` | string, unique |
+  | `discount_type` | enum(`percent`,`amount`) |
+  | `voucher_type` | enum(`shipping`,`product`), default `product` |
+  | `creator_type` | enum(`admin`,`seller`), default `seller` |
+  | `discount_value` | decimal(10,2) |
+  | `min_order_value` | decimal(10,2), default 0 |
+  | `shop_id` | FK → `shops.id`, nullable, null on delete |
+  | `start_date` | datetime |
+  | `end_date` | datetime |
+  | `status` | enum(`active`,`expired`,`disabled`), default `active` |
+  | Timestamps | `created_at`, `updated_at` |
+
+  ### `banners`
+  | Column | Type / Constraints | Notes |
+  |--------|--------------------|-------|
+  | `id` | big integer, PK |
+  | `title` | string |
+  | `subtitle` | string, nullable |
+  | `image_url` | string |
+  | `is_active` | boolean |
+  | Timestamps | `created_at`, `updated_at` |
+
+  ### `carts`
+  | Column | Type / Constraints | Notes |
+  |--------|--------------------|-------|
+  | `id` | big integer, PK |
+  | `user_id` | FK → `users.id`, cascade delete |
+  | `product_id` | FK → `products.id`, cascade delete |
+  | `quantity` | integer, default 1 |
+  | Timestamps | `created_at`, `updated_at` |
+  | Unique | (`user_id`, `product_id`) ensures one entry per product |
+
+  ### `wishlists`
+  | Column | Type / Constraints | Notes |
+  |--------|--------------------|-------|
+  | `id` | big integer, PK |
+  | `user_id` | FK → `users.id`, cascade delete |
+  | `product_id` | FK → `products.id`, cascade delete |
+  | Timestamps | `created_at`, `updated_at` |
+  | Unique | (`user_id`, `product_id`) |
+
+  ### `orders`
+  | Column | Type / Constraints | Notes |
+  |--------|--------------------|-------|
+  | `id` | big integer, PK |
+  | `buyer_id` | FK → `users.id`, cascade delete |
+  | `shop_id` | FK → `shops.id`, cascade delete |
+  | `items` | json (array of `{product_id, qty, price}`) |
+  | `total_amount` | decimal(10,2) |
+  | `shipping_fee` | decimal(10,2), default 0 |
+  | `payment_method` | string |
+  | `status` | enum(`pending`,`confirmed`,`shipping`,`completed`,`cancelled`), default `pending` |
+  | `shipping_address` | json |
+  | Timestamps | `created_at`, `updated_at` |
+
+  ### `transactions`
+  | Column | Type / Constraints | Notes |
+  |--------|--------------------|-------|
+  | `id` | big integer, PK |
+  | `user_id` | FK → `users.id`, cascade delete |
+  | `order_id` | FK → `orders.id`, nullable, set null |
+  | `type` | enum(`purchase`,`withdraw`,`refund`) |
+  | `amount` | decimal(10,2) |
+  | `method` | string |
+  | `status` | enum(`success`,`pending`,`failed`), default `pending` |
+  | Timestamps | `created_at`, `updated_at` |
+
+  > _System tables such as `password_reset_tokens`, `sessions`, `jobs`, and `failed_jobs` follow Laravel's defaults. Refer to `database/migrations/` for the full list if you need additional details._
+
 
 - **Framework**: Laravel 12.x, PHP 8.2+
 - **Auth**: JWT (access + refresh tokens)

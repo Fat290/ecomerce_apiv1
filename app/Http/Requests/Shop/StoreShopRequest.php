@@ -24,10 +24,12 @@ class StoreShopRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'logo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,gif,webp', 'max:2048'], // 2MB max
+            'banner' => ['nullable', 'image', 'mimes:jpeg,jpg,png,gif,webp', 'max:4096'],
             'description' => ['nullable', 'string'],
+            'business_type' => ['nullable', 'string', 'max:150'],
+            'join_date' => ['nullable', 'date'],
             'address' => ['nullable', 'string', 'max:255'],
             'rating' => ['nullable', 'numeric', 'min:0', 'max:5'],
-            'status' => ['required', 'string', 'in:pending,active,inactive'],
         ];
     }
 }

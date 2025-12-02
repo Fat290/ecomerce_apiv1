@@ -1,8 +1,13 @@
 <?php
 
 use App\Http\Controllers\Admin\UserManagementController;
+use App\Http\Controllers\Admin\BannerController as AdminBannerController;
+use App\Http\Controllers\Admin\VoucherController as AdminVoucherController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BannerController;
+use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CartController;
+use App\Http\Controllers\Seller\VoucherController as SellerVoucherController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReviewController;
@@ -13,33 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 
-/*
-|--------------------------------------------------------------------------
-| Health Check Route
-|--------------------------------------------------------------------------
-*/
 
-Route::get('/health', function () {
-    try {
-        // Check database connection
-        DB::connection()->getPdo();
-
-        return response()->json([
-            'status' => 'healthy',
-            'service' => 'backend-ec',
-            'timestamp' => now()->toIso8601String(),
-            'database' => 'connected'
-        ], 200);
-    } catch (\Exception $e) {
-        return response()->json([
-            'status' => 'unhealthy',
-            'service' => 'backend-ec',
-            'timestamp' => now()->toIso8601String(),
-            'database' => 'disconnected',
-            'error' => $e->getMessage()
-        ], 503);
-    }
-});
 
 /*
 |--------------------------------------------------------------------------
@@ -47,11 +26,20 @@ Route::get('/health', function () {
 |--------------------------------------------------------------------------
 */
 
+// Route::get('/login', function () {
+//     return response()->json([
+//         'success' => false,
+//         'message' => 'Unauthenticated.',
+//     ], 401);
+// })->name('login');
+
 Route::prefix('auth')->group(function () {
     // Public routes
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/refresh', [AuthController::class, 'refresh']); // Public - uses refresh token
+    Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+    Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
     // Protected routes (require access token)
     Route::middleware('auth:api')->group(function () {
@@ -67,8 +55,20 @@ Route::prefix('auth')->group(function () {
 |--------------------------------------------------------------------------
 */
 
-// Public product viewing (no authentication required)
+Route::prefix('catalog')->group(function () {
+    // Public product recommendations (leverages auth if token present)
+    Route::get('/products/recommended', [ProductController::class, 'recommended']);
+
+    // Public product list and search
+    Route::get('/products', [ProductController::class, 'publicIndex']);
+    Route::get('/products/search', [ProductController::class, 'publicSearch']);
+});
+
+// Public product detail (no authentication required)
 Route::get('/products/{id}', [ProductController::class, 'show']);
+
+// Public banners for the app (no authentication required)
+Route::get('/banners', [BannerController::class, 'index']);
 
 /*
 |--------------------------------------------------------------------------
@@ -110,6 +110,9 @@ Route::middleware('auth:api')->group(function () {
     Route::delete('/cart/clear', [CartController::class, 'clear']); // Clear all cart items
     Route::delete('/cart/{id}', [CartController::class, 'destroy']);
 
+    // Checkout voucher validation
+    Route::post('/checkout/apply-vouchers', [CheckoutController::class, 'applyVouchers']);
+
     // Wishlist routes (require authentication)
     Route::get('/wishlist', [WishlistController::class, 'index']);
     Route::post('/wishlist', [WishlistController::class, 'store']);
@@ -150,5 +153,28 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/users/{id}/ban', [UserManagementController::class, 'ban']);
         Route::post('/users/{id}/unban', [UserManagementController::class, 'unban']);
         Route::post('/users/{id}/activate-seller', [UserManagementController::class, 'activateSeller']);
+
+        // Banner management
+        Route::get('/banners', [AdminBannerController::class, 'index']);
+        Route::post('/banners', [AdminBannerController::class, 'store']);
+        Route::put('/banners/{id}', [AdminBannerController::class, 'update']);
+        Route::patch('/banners/{id}', [AdminBannerController::class, 'update']);
+        Route::delete('/banners/{id}', [AdminBannerController::class, 'destroy']);
+
+        // Voucher management (admin)
+        Route::get('/vouchers', [AdminVoucherController::class, 'index']);
+        Route::post('/vouchers', [AdminVoucherController::class, 'store']);
+        Route::put('/vouchers/{id}', [AdminVoucherController::class, 'update']);
+        Route::patch('/vouchers/{id}', [AdminVoucherController::class, 'update']);
+        Route::delete('/vouchers/{id}', [AdminVoucherController::class, 'destroy']);
+    });
+
+    // Seller routes
+    Route::prefix('seller')->group(function () {
+        Route::get('/vouchers', [SellerVoucherController::class, 'index']);
+        Route::post('/vouchers', [SellerVoucherController::class, 'store']);
+        Route::put('/vouchers/{id}', [SellerVoucherController::class, 'update']);
+        Route::patch('/vouchers/{id}', [SellerVoucherController::class, 'update']);
+        Route::delete('/vouchers/{id}', [SellerVoucherController::class, 'destroy']);
     });
 });

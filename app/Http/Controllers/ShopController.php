@@ -6,6 +6,7 @@ use App\Http\Requests\Shop\StoreShopRequest;
 use App\Http\Requests\Shop\UpdateShopRequest;
 use App\Models\Shop;
 use App\Traits\HandlesImageUploads;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
@@ -95,8 +96,15 @@ class ShopController extends Controller
             if ($request->hasFile('logo')) {
                 $logoUrl = $this->uploadImage($request->file('logo'), 'shops');
             } elseif ($request->filled('logo') && filter_var($request->logo, FILTER_VALIDATE_URL)) {
-                // Already a URL
                 $logoUrl = $request->logo;
+            }
+
+            // Upload banner if provided
+            $bannerUrl = null;
+            if ($request->hasFile('banner')) {
+                $bannerUrl = $this->uploadImage($request->file('banner'), 'shops');
+            } elseif ($request->filled('banner') && filter_var($request->banner, FILTER_VALIDATE_URL)) {
+                $bannerUrl = $request->banner;
             }
 
             // Create shop with authenticated user as owner
@@ -104,10 +112,13 @@ class ShopController extends Controller
                 'owner_id' => $user->id, // Automatically set from authenticated user
                 'name' => $request->name,
                 'logo' => $logoUrl,
+                'banner' => $bannerUrl,
                 'description' => $request->description,
+                'business_type' => $request->business_type,
+                'join_date' => $request->join_date ? Carbon::parse($request->join_date) : Carbon::now(),
                 'address' => $request->address,
                 'rating' => $request->rating ?? 0,
-                'status' => $request->status ?? 'pending', // Shop status, not user status
+                'status' => 'pending',
             ]);
 
             // Load owner relationship for response
@@ -152,10 +163,15 @@ class ShopController extends Controller
             $updateData = $request->only([
                 'name',
                 'description',
+                'business_type',
                 'address',
                 'rating',
                 'status',
             ]);
+
+            if ($request->filled('join_date')) {
+                $updateData['join_date'] = Carbon::parse($request->join_date);
+            }
 
             // Handle logo upload if provided
             if ($request->hasFile('logo')) {
@@ -167,6 +183,15 @@ class ShopController extends Controller
             } elseif ($request->filled('logo') && filter_var($request->logo, FILTER_VALIDATE_URL)) {
                 // Already a URL
                 $updateData['logo'] = $request->logo;
+            }
+
+            if ($request->hasFile('banner')) {
+                if ($shop->banner) {
+                    $this->deleteImage($shop->banner);
+                }
+                $updateData['banner'] = $this->uploadImage($request->file('banner'), 'shops');
+            } elseif ($request->filled('banner') && filter_var($request->banner, FILTER_VALIDATE_URL)) {
+                $updateData['banner'] = $request->banner;
             }
 
             $shop->update($updateData);

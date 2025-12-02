@@ -6,6 +6,8 @@ use App\Http\Requests\Product\StoreProductRequest;
 use App\Http\Requests\Product\UpdateProductRequest;
 use App\Models\Product;
 use App\Models\Shop;
+use App\Models\Order;
+use App\Models\Wishlist;
 use App\Traits\HandlesImageUploads;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -198,6 +200,95 @@ class ProductController extends Controller
     }
 
     /**
+     * Public catalog listing (no authentication required).
+     */
+    public function publicIndex(Request $request): JsonResponse
+    {
+        try {
+            $query = Product::whereIn('status', ['active', 'out_of_stock']);
+
+            if ($request->filled('search')) {
+                $searchTerm = $request->input('search');
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('name', 'like', "%{$searchTerm}%")
+                        ->orWhere('description', 'like', "%{$searchTerm}%");
+                });
+            }
+
+            if ($request->filled('category_id')) {
+                $query->where('category_id', $request->input('category_id'));
+            }
+
+            if ($request->filled('brand_id')) {
+                $query->where('brand_id', $request->input('brand_id'));
+            }
+
+            if ($request->filled('shop_id')) {
+                $query->where('shop_id', $request->input('shop_id'));
+            }
+
+            if ($request->filled('min_price')) {
+                $query->where('price', '>=', $request->input('min_price'));
+            }
+            if ($request->filled('max_price')) {
+                $query->where('price', '<=', $request->input('max_price'));
+            }
+
+            if ($request->filled('min_rating')) {
+                $query->where('rating', '>=', $request->input('min_rating'));
+            }
+
+            $sortBy = $request->input('sort_by', 'created_at');
+            $sortOrder = strtolower($request->input('sort_order', 'desc')) === 'asc' ? 'asc' : 'desc';
+            $allowedSortFields = ['created_at', 'price', 'rating', 'sold_count', 'name'];
+            if (!in_array($sortBy, $allowedSortFields)) {
+                $sortBy = 'created_at';
+            }
+
+            $query->orderBy($sortBy, $sortOrder)
+                ->with(['category', 'brand', 'shop']);
+
+            $perPage = min(max(1, (int) $request->input('per_page', 20)), 100);
+            $products = $query->paginate($perPage);
+
+            return $this->paginatedResponse($products, 'Products retrieved successfully');
+        } catch (\Exception $e) {
+            return $this->serverErrorResponse('Failed to retrieve products: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Public search endpoint (keyword-focused).
+     */
+    public function publicSearch(Request $request): JsonResponse
+    {
+        $request->validate([
+            'q' => ['required', 'string'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
+        ]);
+
+        try {
+            $term = $request->input('q');
+            $limit = (int) $request->input('limit', 20);
+
+            $products = Product::whereIn('status', ['active', 'out_of_stock'])
+                ->where(function ($q) use ($term) {
+                    $q->where('name', 'like', "%{$term}%")
+                        ->orWhere('description', 'like', "%{$term}%");
+                })
+                ->with(['category', 'brand', 'shop'])
+                ->orderByDesc('sold_count')
+                ->orderByDesc('rating')
+                ->limit($limit)
+                ->get();
+
+            return $this->successResponse($products, 'Search results retrieved successfully.');
+        } catch (\Exception $e) {
+            return $this->serverErrorResponse('Failed to search products: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Display the specified product.
      * Public endpoint - no authentication required.
      */
@@ -352,6 +443,99 @@ class ProductController extends Controller
             return $this->successResponse(null, 'Product deleted successfully');
         } catch (\Exception $e) {
             return $this->serverErrorResponse('Failed to delete product: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Recommended products for a user (if logged in) or generic fallback.
+     */
+    public function recommended(Request $request): JsonResponse
+    {
+        try {
+            $user = null;
+
+            try {
+                $user = JWTAuth::parseToken()->authenticate();
+            } catch (\Exception $e) {
+                $user = null;
+            }
+
+            // Fallback: no auth -> show top sellers + most favorited
+            if (!$user) {
+                $products = Product::where('status', 'active')
+                    ->withCount('wishlists')
+                    ->orderByDesc('sold_count')
+                    ->orderByDesc('wishlists_count')
+                    ->limit(20)
+                    ->get();
+
+                return $this->successResponse($products, 'Recommended products (generic).');
+            }
+
+            // Authenticated user: find related categories/brands from past orders or wishlists
+            $categoryIds = [];
+            $brandIds = [];
+            $purchasedProductIds = [];
+
+            $orders = Order::where('buyer_id', $user->id)->get();
+            $purchasedProductIds = $orders->flatMap(function ($order) {
+                if (!is_array($order->items)) {
+                    return [];
+                }
+                return collect($order->items)
+                    ->pluck('product_id')
+                    ->filter();
+            })->unique();
+
+            if ($purchasedProductIds->isNotEmpty()) {
+                $categoryIds = Product::whereIn('id', $purchasedProductIds)
+                    ->whereNotNull('category_id')
+                    ->pluck('category_id');
+
+                $brandIds = Product::whereIn('id', $purchasedProductIds)
+                    ->whereNotNull('brand_id')
+                    ->pluck('brand_id');
+            } else {
+                // fall back to wishlist interests if no purchases
+                $wishlistProductIds = Wishlist::where('user_id', $user->id)->pluck('product_id');
+                if ($wishlistProductIds->isNotEmpty()) {
+                    $categoryIds = Product::whereIn('id', $wishlistProductIds)
+                        ->whereNotNull('category_id')
+                        ->pluck('category_id');
+
+                    $brandIds = Product::whereIn('id', $wishlistProductIds)
+                        ->whereNotNull('brand_id')
+                        ->pluck('brand_id');
+                }
+            }
+
+            $query = Product::where('status', 'active')
+                ->withCount('wishlists')
+                ->orderByDesc('sold_count');
+
+            if (!empty($categoryIds)) {
+                $query->whereIn('category_id', $categoryIds);
+            }
+
+            if (!empty($brandIds)) {
+                $query->orWhereIn('brand_id', $brandIds);
+            }
+
+            $products = $query->limit(20)->get();
+
+            if ($products->isEmpty()) {
+                // fallback to generic
+                $products = Product::where('status', 'active')
+                    ->withCount('wishlists')
+                    ->orderByDesc('sold_count')
+                    ->orderByDesc('wishlists_count')
+                    ->limit(20)
+                    ->get();
+            }
+
+            return $this->successResponse($products, 'Recommended products retrieved successfully.');
+        } catch (\Exception $e) {
+            return $this->serverErrorResponse('Failed to fetch recommended products: ' . $e->getMessage());
         }
     }
 }

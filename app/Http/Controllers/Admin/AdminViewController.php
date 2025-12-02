@@ -32,4 +32,20 @@ class AdminViewController extends Controller
     {
         return view('admin.users');
     }
+
+    /**
+     * Show the banner management page.
+     */
+    public function banners()
+    {
+        return view('admin.banners');
+    }
+
+    /**
+     * Show the voucher management page.
+     */
+    public function vouchers()
+    {
+        return view('admin.vouchers');
+    }
 }

@@ -15,9 +15,11 @@ return new class extends Migration
             $table->id();
             $table->string('code')->unique();
             $table->enum('discount_type', ['percent', 'amount']);
+            $table->enum('voucher_type', ['shipping', 'product'])->default('product');
+            $table->enum('creator_type', ['admin', 'seller'])->default('seller');
             $table->decimal('discount_value', 10, 2);
             $table->decimal('min_order_value', 10, 2)->default(0);
-            $table->foreignId('shop_id')->constrained('shops')->onDelete('cascade');
+            $table->foreignId('shop_id')->nullable()->constrained('shops')->nullOnDelete();
             $table->dateTime('start_date');
             $table->dateTime('end_date');
             $table->enum('status', ['active', 'expired', 'disabled'])->default('active');

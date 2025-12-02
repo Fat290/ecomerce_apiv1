@@ -20,6 +20,8 @@ class Voucher extends Model
         'discount_value',
         'min_order_value',
         'shop_id',
+        'voucher_type',
+        'creator_type',
         'start_date',
         'end_date',
         'status',

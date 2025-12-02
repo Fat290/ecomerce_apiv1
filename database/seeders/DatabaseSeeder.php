@@ -17,12 +17,9 @@ class DatabaseSeeder extends Seeder
             CategorySeeder::class,
             ShopSeeder::class,
             ProductSeeder::class,
-            VoucherSeeder::class,
-            OrderSeeder::class,
+
             ReviewSeeder::class,
-            ChatSeeder::class,
-            NotificationSeeder::class,
-            TransactionSeeder::class,
+
             AnalyticsSeeder::class,
         ]);
     }
