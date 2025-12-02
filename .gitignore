@@ -22,3 +22,13 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Docker documentation files
+DEPLOYMENT.md
+DEPLOYMENT_CHECKLIST.md
+DOCKER_SETUP.md
+README.docker.md
+DOCKER_README.txt
+
+# Keep README.md in version control
+# !README.md

@@ -1,0 +1,147 @@
+# Render.com Blueprint Configuration
+# Visit: https://dashboard.render.com/
+
+services:
+  # Web Service - Laravel Application
+  - type: web
+    name: backend-ec
+    runtime: docker
+    plan: starter # Change to 'standard' or higher for production
+    region: oregon # Choose your preferred region
+    branch: main # Your git branch
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+
+    # Environment Variables
+    envVars:
+      - key: APP_NAME
+        value: "E-Commerce Backend"
+
+      - key: APP_ENV
+        value: production
+
+      - key: APP_DEBUG
+        value: false
+
+      - key: APP_KEY
+        generateValue: true # Render will generate this
+
+      - key: APP_URL
+        value: https://backend-ec.onrender.com # Update with your actual URL
+
+      - key: LOG_CHANNEL
+        value: stderr
+
+      - key: LOG_LEVEL
+        value: error
+
+      - key: DB_CONNECTION
+        value: mysql # or pgsql
+
+      - key: DB_HOST
+        fromDatabase:
+          name: backend-ec-db
+          property: host
+
+      - key: DB_PORT
+        fromDatabase:
+          name: backend-ec-db
+          property: port
+
+      - key: DB_DATABASE
+        fromDatabase:
+          name: backend-ec-db
+          property: database
+
+      - key: DB_USERNAME
+        fromDatabase:
+          name: backend-ec-db
+          property: user
+
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: backend-ec-db
+          property: password
+
+      - key: CACHE_STORE
+        value: redis
+
+      - key: QUEUE_CONNECTION
+        value: redis
+
+      - key: SESSION_DRIVER
+        value: redis
+
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: backend-ec-redis
+          property: host
+
+      - key: REDIS_PASSWORD
+        fromService:
+          type: redis
+          name: backend-ec-redis
+          property: password
+
+      - key: REDIS_PORT
+        value: "6379"
+
+      # JWT Configuration
+      - key: JWT_SECRET
+        generateValue: true
+
+      - key: JWT_TTL
+        value: "60"
+
+      - key: JWT_REFRESH_TTL
+        value: "20160"
+
+      # Cloudinary Configuration (Add your values)
+      - key: CLOUDINARY_URL
+        sync: false # Set manually in Render dashboard
+
+      - key: CLOUDINARY_UPLOAD_PRESET
+        sync: false
+
+      - key: CLOUDINARY_NOTIFICATION_URL
+        sync: false
+
+      # Pusher Configuration (Add your values)
+      - key: PUSHER_APP_ID
+        sync: false
+
+      - key: PUSHER_APP_KEY
+        sync: false
+
+      - key: PUSHER_APP_SECRET
+        sync: false
+
+      - key: PUSHER_APP_CLUSTER
+        value: "mt1"
+
+      # Optional: Disable migrations/seeders on deploy
+      - key: RUN_MIGRATIONS
+        value: "true"
+
+      - key: RUN_SEEDERS
+        value: "false"
+
+    # Health check
+    healthCheckPath: /api/health
+
+    # Auto-deploy on push
+    autoDeploy: true
+
+# Database - MySQL
+databases:
+  - name: backend-ec-db
+    databaseName: backend_ec
+    plan: starter # Change to 'standard' for production
+    region: oregon
+
+  # Redis Cache
+  - name: backend-ec-redis
+    plan: starter
+    region: oregon
+    maxmemoryPolicy: allkeys-lru
