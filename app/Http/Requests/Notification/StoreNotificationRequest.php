@@ -26,7 +26,7 @@ class StoreNotificationRequest extends FormRequest
             'user_id' => ['required', 'exists:users,id'],
             'title' => ['required', 'string', 'max:255'],
             'message' => ['required', 'string'],
-            'type' => ['required', 'string', Rule::in(['order', 'promotion', 'system'])],
+            'type' => ['required', 'string', Rule::in(['order', 'promotion', 'information'])],
             'is_read' => ['nullable', 'boolean'],
         ];
     }

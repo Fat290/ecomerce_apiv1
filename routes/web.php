@@ -7,6 +7,8 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::view('/demo/shop-onboarding', 'demo.shop-onboarding')->name('demo.shop-onboarding');
+
 // Admin Panel Routes
 Route::prefix('admin')->group(function () {
     Route::get('/login', [AdminViewController::class, 'login'])->name('admin.login');

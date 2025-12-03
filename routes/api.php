@@ -14,6 +14,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\Seller\VoucherController as SellerVoucherController;
+use App\Http\Controllers\VoucherBrowseController;
 use App\Http\Controllers\ShopController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WishlistController;
@@ -76,6 +77,8 @@ Route::get('/banners', [BannerController::class, 'index']);
 Route::get('/business-types', [BusinessTypeController::class, 'index']);
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/categories/{category}/variants', [CategoryController::class, 'variants']);
+Route::get('/vouchers/available', [VoucherBrowseController::class, 'available']);
+Route::get('/vouchers/claimable', [VoucherBrowseController::class, 'claimable']);
 
 /*
 |--------------------------------------------------------------------------

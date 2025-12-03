@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Events\NotificationCreated;
 use App\Models\Notification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -46,7 +47,7 @@ class SendNotificationJob implements ShouldQueue
     public function handle(): void
     {
         try {
-            Notification::create([
+            $notification = Notification::create([
                 'user_id' => $this->userId,
                 'type' => $this->type,
                 'title' => $this->title,
@@ -55,6 +56,8 @@ class SendNotificationJob implements ShouldQueue
                 'action_url' => $this->actionUrl,
                 'is_read' => false,
             ]);
+
+            event(new NotificationCreated($notification));
         } catch (\Exception $e) {
             Log::error('Failed to send notification: ' . $e->getMessage(), [
                 'user_id' => $this->userId,

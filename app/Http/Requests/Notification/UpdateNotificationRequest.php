@@ -26,7 +26,7 @@ class UpdateNotificationRequest extends FormRequest
             'user_id' => ['sometimes', 'exists:users,id'],
             'title' => ['sometimes', 'string', 'max:255'],
             'message' => ['sometimes', 'string'],
-            'type' => ['sometimes', 'string', Rule::in(['order', 'promotion', 'system'])],
+            'type' => ['sometimes', 'string', Rule::in(['order', 'promotion', 'information'])],
             'is_read' => ['nullable', 'boolean'],
         ];
     }

@@ -390,6 +390,7 @@
         </main>
     </div>
 
+    <script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
     <script>
         // Mobile menu toggle
         const mobileMenuBtn = document.getElementById('mobile-menu-btn');
@@ -453,6 +454,10 @@
 
         // Set token in headers for API calls
         const apiBaseUrl = window.location.origin + '/api';
+        const pusherKey = @json(config('broadcasting.connections.pusher.key'));
+        const pusherCluster = @json(config('broadcasting.connections.pusher.options.cluster'));
+        let pusherClient = null;
+        const subscribedNotificationChannels = new Set();
 
         async function fetchWithAuth(url, options = {}) {
             const token = localStorage.getItem('access_token');
@@ -507,6 +512,59 @@
             window.location.href = '/admin/login';
         }
 
+        function initializeRealtimeNotifications(userId) {
+            if (!pusherKey || !window.Pusher) {
+                return;
+            }
+
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                return;
+            }
+
+            if (pusherClient) {
+                pusherClient.disconnect();
+                subscribedNotificationChannels.clear();
+            }
+
+            pusherClient = new Pusher(pusherKey, {
+                cluster: pusherCluster || 'mt1',
+                authEndpoint: `${apiBaseUrl}/broadcasting/auth`,
+                auth: {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json',
+                    },
+                },
+            });
+
+            subscribeToNotificationChannel(userId);
+            ['order', 'promotion', 'information'].forEach(type => subscribeToNotificationChannel(userId, type));
+        }
+
+        function subscribeToNotificationChannel(userId, type = 'all') {
+            if (!pusherClient) {
+                return;
+            }
+
+            const channelName = type === 'all'
+                ? `private-notifications.${userId}`
+                : `private-notifications.${userId}.${type}`;
+
+            if (subscribedNotificationChannels.has(channelName)) {
+                return;
+            }
+
+            const channel = pusherClient.subscribe(channelName);
+            channel.bind('notification.created', payload => handleRealtimeNotification(payload));
+            subscribedNotificationChannels.add(channelName);
+        }
+
+        function handleRealtimeNotification(payload) {
+            const toastType = payload.type === 'promotion' ? 'success' : 'info';
+            showToast(`${payload.title}: ${payload.message}`, toastType);
+        }
+
         // Load admin info on page load
         fetchWithAuth('/auth/me')
             .then(res => res.json())
@@ -521,6 +579,8 @@
                     if (adminNameEl) {
                         adminNameEl.textContent = data.data.name;
                     }
+
+                    initializeRealtimeNotifications(data.data.id);
                 } else {
                     logout();
                 }

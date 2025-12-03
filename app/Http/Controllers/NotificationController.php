@@ -18,6 +18,25 @@ class NotificationController extends Controller
     }
 
     /**
+     * Build a normalized unread breakdown for the three notification types.
+     */
+    protected function unreadBreakdown(int $userId): array
+    {
+        $rawCounts = Notification::selectRaw('type, COUNT(*) as total')
+            ->where('user_id', $userId)
+            ->where('is_read', false)
+            ->groupBy('type')
+            ->pluck('total', 'type')
+            ->toArray();
+
+        return [
+            'order' => (int) ($rawCounts['order'] ?? 0),
+            'promotion' => (int) ($rawCounts['promotion'] ?? 0),
+            'information' => (int) ($rawCounts['information'] ?? 0),
+        ];
+    }
+
+    /**
      * Get all notifications for the authenticated user.
      */
     public function index(Request $request): JsonResponse
@@ -52,13 +71,14 @@ class NotificationController extends Controller
 
             $notifications = $query->paginate($perPage);
 
-            // Get unread count
+            // Get unread summary
             $unreadCount = Notification::where('user_id', $user->id)
                 ->where('is_read', false)
                 ->count();
 
             return $this->paginatedResponse($notifications, 'Notifications retrieved successfully', [
                 'unread_count' => $unreadCount,
+                'unread_breakdown' => $this->unreadBreakdown($user->id),
             ]);
         } catch (\Exception $e) {
             return $this->serverErrorResponse('Failed to retrieve notifications: ' . $e->getMessage());
@@ -185,6 +205,7 @@ class NotificationController extends Controller
 
             return $this->successResponse([
                 'unread_count' => $count,
+                'unread_breakdown' => $this->unreadBreakdown($user->id),
             ], 'Unread count retrieved successfully');
         } catch (\Exception $e) {
             return $this->serverErrorResponse('Failed to get unread count: ' . $e->getMessage());
@@ -206,7 +227,7 @@ class NotificationController extends Controller
 
             $request->validate([
                 'user_id' => ['required', 'exists:users,id'],
-                'type' => ['required', 'string', 'in:order_update,order_placed,chat_message,promotion,product_review,shop_review,system'],
+                'type' => ['required', 'string', 'in:order,promotion,information'],
                 'title' => ['required', 'string', 'max:255'],
                 'message' => ['required', 'string'],
                 'data' => ['nullable', 'array'],

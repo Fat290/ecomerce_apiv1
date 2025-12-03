@@ -13,7 +13,7 @@ class NotificationService
      * Send a notification to a user (queued).
      *
      * @param int|User $user
-     * @param string $type
+     * @param string $type One of: order, promotion, information
      * @param string $title
      * @param string $message
      * @param array|null $data
@@ -40,7 +40,7 @@ class NotificationService
      * Send notification immediately (synchronous).
      *
      * @param int|User $user
-     * @param string $type
+     * @param string $type Notification category: order, promotion, information
      * @param string $title
      * @param string $message
      * @param array|null $data
@@ -71,7 +71,7 @@ class NotificationService
     {
         return $this->send(
             $user,
-            'order_update',
+            'order',
             'Order Update',
             $message,
             ['order_id' => $orderId, 'status' => $status],
@@ -86,7 +86,7 @@ class NotificationService
     {
         return $this->send(
             $shopOwner,
-            'order_placed',
+            'order',
             'New Order Received',
             "You have received a new order from {$buyerName} for $" . number_format($totalAmount, 2),
             ['order_id' => $orderId, 'buyer_name' => $buyerName, 'total_amount' => $totalAmount],
@@ -101,7 +101,7 @@ class NotificationService
     {
         return $this->send(
             $user,
-            'chat_message',
+            'information',
             'New Message',
             "{$senderName}: " . substr($message, 0, 100),
             ['chat_id' => $chatId, 'sender_name' => $senderName],
@@ -131,7 +131,7 @@ class NotificationService
     {
         return $this->send(
             $shopOwner,
-            'product_review',
+            'information',
             'New Product Review',
             "{$reviewerName} left a {$rating}-star review on {$productName}",
             ['product_id' => $productId, 'reviewer_name' => $reviewerName, 'rating' => $rating],
@@ -146,7 +146,7 @@ class NotificationService
     {
         return $this->send(
             $shopOwner,
-            'shop_review',
+            'information',
             'New Shop Review',
             "{$reviewerName} left a {$rating}-star review on your shop",
             ['shop_id' => $shopId, 'reviewer_name' => $reviewerName, 'rating' => $rating],
@@ -155,18 +155,26 @@ class NotificationService
     }
 
     /**
-     * Send system notification.
+     * Send high-level information/system notification.
      */
-    public function sendSystem(User $user, string $title, string $message, ?array $data = null, ?string $actionUrl = null): Notification
+    public function sendInformation(User $user, string $title, string $message, ?array $data = null, ?string $actionUrl = null): Notification
     {
         return $this->send(
             $user,
-            'system',
+            'information',
             $title,
             $message,
             $data,
             $actionUrl
         );
+    }
+
+    /**
+     * @deprecated Use sendInformation instead.
+     */
+    public function sendSystem(User $user, string $title, string $message, ?array $data = null, ?string $actionUrl = null): Notification
+    {
+        return $this->sendInformation($user, $title, $message, $data, $actionUrl);
     }
 
     /**

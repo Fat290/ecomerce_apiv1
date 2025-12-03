@@ -27,7 +27,7 @@ class StoreShopRequest extends FormRequest
             'logo' => ['nullable', 'image', 'mimes:jpeg,jpg,png,gif,webp', 'max:2048'], // 2MB max
             'banner' => ['nullable', 'image', 'mimes:jpeg,jpg,png,gif,webp', 'max:4096'],
             'description' => ['nullable', 'string'],
-            'business_type_id' => ['required', 'string', Rule::exists('business_types', 'id')->where('is_active', true)],
+            'business_type_id' => ['required', 'integer', Rule::exists('business_types', 'id')->where('is_active', true)],
             'join_date' => ['nullable', 'date'],
             'address' => ['nullable', 'string', 'max:255'],
             'rating' => ['nullable', 'numeric', 'min:0', 'max:5'],

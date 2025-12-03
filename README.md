@@ -1438,7 +1438,7 @@ Get all notifications for authenticated user.
 **Headers:** `Authorization: Bearer <access_token>`
 
 **Query Parameters:**
-- `type` - Filter by type: `order_update`, `order_placed`, `chat_message`, `promotion`, `product_review`, `shop_review`, `system`
+- `type` - Filter by type: `order`, `promotion`, `information`
 - `is_read` - Filter by read status (true/false)
 - `sort_order` - `asc` or `desc` (default: desc)
 - `per_page` - Items per page (default: 15)
@@ -1452,7 +1452,7 @@ Get all notifications for authenticated user.
     {
       "id": 1,
       "user_id": 1,
-      "type": "order_update",
+      "type": "order",
       "title": "Order Update",
       "message": "Your order #123 has been shipped",
       "data": {
@@ -1466,7 +1466,12 @@ Get all notifications for authenticated user.
     }
   ],
   "pagination": { ... },
-  "unread_count": 5
+  "unread_count": 5,
+  "unread_breakdown": {
+    "order": 3,
+    "promotion": 1,
+    "information": 1
+  }
 }
 ```
 
@@ -1482,7 +1487,12 @@ Get unread notification count.
   "success": true,
   "message": "Unread count retrieved successfully",
   "data": {
-    "unread_count": 5
+    "unread_count": 5,
+    "unread_breakdown": {
+      "order": 3,
+      "promotion": 1,
+      "information": 1
+    }
   }
 }
 ```
@@ -1501,7 +1511,7 @@ Get specific notification.
   "data": {
     "id": 1,
     "user_id": 1,
-    "type": "order_update",
+    "type": "order",
     "title": "Order Update",
     "message": "Your order #123 has been shipped",
     "data": { ... },
@@ -1573,7 +1583,7 @@ Send test notification (for testing purposes).
 ```json
 {
   "user_id": 1,
-  "type": "system",
+  "type": "information",
   "title": "Test Notification",
   "message": "This is a test notification",
   "data": {
@@ -1589,6 +1599,109 @@ Send test notification (for testing purposes).
   "success": true,
   "message": "Test notification sent successfully",
   "data": { ... }
+}
+```
+
+#### Real-time Notifications (Pusher)
+
+To receive instant updates for the three notification types (order, promotion, information):
+
+1. **Configure environment variables**
+   ```
+   BROADCAST_CONNECTION=pusher
+   PUSHER_APP_ID=your-app-id
+   PUSHER_APP_KEY=your-key
+   PUSHER_APP_SECRET=your-secret
+   PUSHER_APP_CLUSTER=your-cluster
+   ```
+2. **Start the queue worker** so `SendNotificationJob` can persist and broadcast messages:
+   ```
+   php artisan queue:work
+   ```
+3. **Authorize private channels** by calling `POST /api/broadcasting/auth` with the user's JWT access token in the `Authorization` header. This happens automatically when using the provided Pusher JS snippet below.
+4. **Subscribe from the client** (example using Pusher JS 8):
+   ```html
+   <script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
+   <script>
+       const pusher = new Pusher('PUSHER_APP_KEY', {
+           cluster: 'PUSHER_APP_CLUSTER',
+           authEndpoint: '/api/broadcasting/auth',
+           auth: {
+               headers: {
+                   Authorization: `Bearer ${yourAccessToken}`,
+                   Accept: 'application/json',
+               },
+           },
+       });
+
+       const channel = pusher.subscribe(`private-notifications.${userId}`);
+       channel.bind('notification.created', function (payload) {
+           console.log(payload.type, payload.title, payload.message);
+       });
+   </script>
+   ```
+5. **Listen per category** (optional) by subscribing to `private-notifications.{userId}.order|promotion|information`.
+
+### Voucher Catalog Routes
+
+#### GET `/api/vouchers/available`
+
+List vouchers that are currently active (within their validity window).
+
+**Query Parameters (optional):**
+- `voucher_type` – `shipping` or `product`
+- `creator_type` – `admin` or `seller`
+- `discount_type` – `percent` or `amount`
+- `shop_id` – limit to a specific shop
+- `admin_only` / `seller_only` – boolean flags (true/false)
+- `per_page` – pagination size (default 20, max 100)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Available vouchers retrieved successfully.",
+  "data": [
+    {
+      "id": 12,
+      "code": "WELCOME20",
+      "voucher_type": "product",
+      "creator_type": "admin",
+      "discount_type": "percent",
+      "discount_value": "20.00",
+      "min_order_value": "100.00",
+      "start_date": "2025-12-01T00:00:00.000000Z",
+      "end_date": "2025-12-31T23:59:59.000000Z",
+      "status": "active",
+      "shop": null
+    }
+  ],
+  "pagination": { "...": "..." }
+}
+```
+
+#### GET `/api/vouchers/claimable`
+
+List vouchers that will become active soon (users can claim ahead of time).
+
+**Query Parameters:** same as `/api/vouchers/available`.
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Claimable vouchers retrieved successfully.",
+  "data": [
+    {
+      "id": 34,
+      "code": "NYFLASH",
+      "voucher_type": "product",
+      "start_date": "2026-01-01T00:00:00.000000Z",
+      "end_date": "2026-01-07T23:59:59.000000Z",
+      "status": "active"
+    }
+  ],
+  "pagination": { "...": "..." }
 }
 ```
 

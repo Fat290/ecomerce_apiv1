@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->string('title');
             $table->text('message');
-            $table->enum('type', ['order_update', 'order_placed', 'chat_message', 'promotion', 'product_review', 'shop_review', 'system'])->default('system');
+            $table->enum('type', ['order', 'promotion', 'information'])->default('information');
             $table->json('data')->nullable(); // Store additional data like order_id, chat_id, etc.
             $table->string('action_url')->nullable(); // URL to navigate when notification is clicked
             $table->boolean('is_read')->default(false);

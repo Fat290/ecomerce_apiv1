@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Shop\StoreShopRequest;
 use App\Http\Requests\Shop\UpdateShopRequest;
 use App\Models\Shop;
+use App\Models\User;
+use App\Services\NotificationService;
 use App\Traits\HandlesImageUploads;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -14,6 +16,13 @@ use Tymon\JWTAuth\Facades\JWTAuth;
 class ShopController extends Controller
 {
     use HandlesImageUploads;
+
+    protected NotificationService $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
     /**
      * Display a listing of shops.
      * For sellers: shows their own shop
@@ -165,7 +174,7 @@ class ShopController extends Controller
                 'logo' => $logoUrl,
                 'banner' => $bannerUrl,
                 'description' => $request->description,
-                'business_type_id' => $request->business_type_id->toInteger(),
+                'business_type_id' => (int) $request->input('business_type_id'),
                 'join_date' => $request->join_date ? Carbon::parse($request->join_date) : Carbon::now(),
                 'address' => $request->address,
                 'rating' => $request->rating ?? 0,
@@ -250,21 +259,25 @@ class ShopController extends Controller
             $shop->update($updateData);
 
             // When an admin activates a shop, promote the owner to seller
-            if (
-                $user->role === 'admin'
+            $statusChangedByAdmin = $user->role === 'admin'
                 && array_key_exists('status', $updateData)
-                && $previousStatus !== 'active'
-                && $shop->status === 'active'
-            ) {
-                $owner = $shop->owner()->first();
-                if ($owner) {
-                    $ownerUpdate = ['status' => 'active'];
+                && $previousStatus !== $shop->status;
 
-                    if ($owner->role !== 'admin') {
-                        $ownerUpdate['role'] = 'seller';
+            if ($statusChangedByAdmin) {
+                $owner = $shop->owner()->first();
+
+                if ($owner) {
+                    if ($shop->status === 'active') {
+                        $ownerUpdate = ['status' => 'active'];
+
+                        if ($owner->role !== 'admin') {
+                            $ownerUpdate['role'] = 'seller';
+                        }
+
+                        $owner->update($ownerUpdate);
                     }
 
-                    $owner->update($ownerUpdate);
+                    $this->sendShopStatusNotification($owner, $shop, $shop->status);
                 }
             }
 
@@ -275,5 +288,38 @@ class ShopController extends Controller
         } catch (\Exception $e) {
             return $this->serverErrorResponse('Failed to update shop: ' . $e->getMessage());
         }
+    }
+    protected function sendShopStatusNotification(User $owner, Shop $shop, string $newStatus): void
+    {
+        $messages = [
+            'active' => [
+                'title' => 'Shop Approved',
+                'message' => "Your shop {$shop->name} has been approved and is now live.",
+            ],
+            'pending' => [
+                'title' => 'Shop Review Updated',
+                'message' => "Your shop {$shop->name} is back under review. We'll notify you once it's processed.",
+            ],
+            'banned' => [
+                'title' => 'Shop Disabled',
+                'message' => "Your shop {$shop->name} has been disabled. Please contact support for details.",
+            ],
+        ];
+
+        $payload = $messages[$newStatus] ?? [
+            'title' => 'Shop Status Updated',
+            'message' => "Your shop {$shop->name} status is now {$newStatus}.",
+        ];
+
+        $this->notificationService->sendInformation(
+            $owner,
+            $payload['title'],
+            $payload['message'],
+            [
+                'shop_id' => $shop->id,
+                'status' => $newStatus,
+            ],
+            "/seller/shops/{$shop->id}"
+        );
     }
 }
