@@ -11,6 +11,7 @@ use App\Http\Controllers\CartController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\Seller\VoucherController as SellerVoucherController;
@@ -98,6 +99,8 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/profile', [UserController::class, 'profile']);
     Route::put('/profile', [UserController::class, 'updateProfile']);
     Route::patch('/profile', [UserController::class, 'updateProfile']);
+    Route::put('/profile/shipping-address', [UserController::class, 'updateShippingAddress']);
+    Route::patch('/profile/shipping-address', [UserController::class, 'updateShippingAddress']);
     Route::get('/users/{id}', [UserController::class, 'show']); // Public user profile
 
     // Shop routes (require authentication)
@@ -115,7 +118,7 @@ Route::middleware('auth:api')->group(function () {
     // Chat routes
     Route::get('/chats', [ChatController::class, 'index']);
     Route::get('/chats/{chat}', [ChatController::class, 'show']);
-    Route::post('/shops/{shop}/chat/messages', [ChatController::class, 'messageShop']);
+    Route::post('/shops/{shop}/chat/mess ages', [ChatController::class, 'messageShop']);
     Route::post('/chats/{chat}/messages', [ChatController::class, 'reply']);
 
     // Product routes (require authentication)
@@ -134,8 +137,16 @@ Route::middleware('auth:api')->group(function () {
     Route::delete('/cart/clear', [CartController::class, 'clear']); // Clear all cart items
     Route::delete('/cart/{id}', [CartController::class, 'destroy']);
 
-    // Checkout voucher validation
+    // Checkout routes
     Route::post('/checkout/apply-vouchers', [CheckoutController::class, 'applyVouchers']);
+    Route::post('/checkout', [CheckoutController::class, 'checkout']);
+
+    // Order routes (require authentication)
+    Route::get('/orders', [OrderController::class, 'index']);
+    Route::get('/orders/{id}', [OrderController::class, 'show']);
+    Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+    Route::patch('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+    Route::get('/shops/{shopId}/orders', [OrderController::class, 'shopOrders']);
 
     // Wishlist routes (require authentication)
     Route::get('/wishlist', [WishlistController::class, 'index']);

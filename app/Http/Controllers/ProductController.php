@@ -61,11 +61,6 @@ class ProductController extends Controller
                 $query->where('category_id', $request->input('category_id'));
             }
 
-            // Filter by brand
-            if ($request->filled('brand_id')) {
-                $query->where('brand_id', $request->input('brand_id'));
-            }
-
             // Filter by status (only for sellers/admins)
             if ($request->filled('status') && in_array($user->role, ['seller', 'admin'])) {
                 $query->where('status', $request->input('status'));
@@ -107,7 +102,7 @@ class ProductController extends Controller
             $query->orderBy($sortBy, $sortOrder);
 
             // Load relationships
-            $query->with(['category.variants', 'brand', 'shop']);
+            $query->with(['category.variants', 'shop', 'variantOptions.variant']);
 
             // Pagination
             $perPage = $request->input('per_page', 15);
@@ -180,7 +175,6 @@ class ProductController extends Controller
             $product = Product::create([
                 'shop_id' => $shop->id, // Automatically set from seller's shop
                 'category_id' => $request->category_id,
-                'brand_id' => $request->brand_id,
                 'name' => $request->name,
                 'description' => $request->description,
                 'images' => !empty($imageUrls) ? $imageUrls : null,
@@ -191,8 +185,11 @@ class ProductController extends Controller
                 'sold_count' => $request->sold_count ?? 0,
             ]);
 
+            $product->load('category');
+            $this->syncProductVariantOptions($product, $request->input('variants', []));
+
             // Load relationships for response
-            $product->load(['category.variants', 'brand', 'shop']);
+            $product->load(['category.variants', 'shop', 'variantOptions.variant']);
 
             return $this->createdResponse($product, 'Product created successfully');
         } catch (\Exception $e) {
@@ -220,10 +217,6 @@ class ProductController extends Controller
                 $query->where('category_id', $request->input('category_id'));
             }
 
-            if ($request->filled('brand_id')) {
-                $query->where('brand_id', $request->input('brand_id'));
-            }
-
             if ($request->filled('shop_id')) {
                 $query->where('shop_id', $request->input('shop_id'));
             }
@@ -247,7 +240,7 @@ class ProductController extends Controller
             }
 
             $query->orderBy($sortBy, $sortOrder)
-                ->with(['category.variants', 'brand', 'shop']);
+                ->with(['category.variants', 'shop', 'variantOptions.variant']);
 
             $perPage = min(max(1, (int) $request->input('per_page', 20)), 100);
             $products = $query->paginate($perPage);
@@ -280,7 +273,7 @@ class ProductController extends Controller
                     $q->where('name', 'like', "%{$term}%")
                         ->orWhere('description', 'like', "%{$term}%");
                 })
-                ->with(['category.variants', 'brand', 'shop'])
+                ->with(['category.variants', 'shop', 'variantOptions.variant'])
                 ->orderByDesc('sold_count')
                 ->orderByDesc('rating')
                 ->paginate($perPage);
@@ -298,7 +291,7 @@ class ProductController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $product = Product::with(['category.variants', 'brand', 'shop', 'reviews'])
+            $product = Product::with(['category.variants', 'shop', 'reviews', 'variantOptions.variant'])
                 ->find($id);
 
             if (!$product) {
@@ -364,7 +357,6 @@ class ProductController extends Controller
             // Handle image updates
             $updateData = $request->only([
                 'category_id',
-                'brand_id',
                 'name',
                 'description',
                 'price',
@@ -398,8 +390,14 @@ class ProductController extends Controller
 
             $product->update($updateData);
 
+            $product->refresh()->load('category');
+
+            if ($request->has('variants')) {
+                $this->syncProductVariantOptions($product, $request->input('variants', []));
+            }
+
             // Load relationships for response
-            $product->load(['category.variants', 'brand', 'shop']);
+            $product->load(['category.variants', 'shop', 'variantOptions.variant']);
 
             return $this->successResponse($product, 'Product updated successfully');
         } catch (\Exception $e) {
@@ -492,7 +490,6 @@ class ProductController extends Controller
 
             // Authenticated user: find related categories/brands from past orders or wishlists
             $categoryIds = [];
-            $brandIds = [];
             $purchasedProductIds = [];
 
             $orders = Order::where('buyer_id', $user->id)->get();
@@ -509,10 +506,6 @@ class ProductController extends Controller
                 $categoryIds = Product::whereIn('id', $purchasedProductIds)
                     ->whereNotNull('category_id')
                     ->pluck('category_id');
-
-                $brandIds = Product::whereIn('id', $purchasedProductIds)
-                    ->whereNotNull('brand_id')
-                    ->pluck('brand_id');
             } else {
                 // fall back to wishlist interests if no purchases
                 $wishlistProductIds = Wishlist::where('user_id', $user->id)->pluck('product_id');
@@ -520,10 +513,6 @@ class ProductController extends Controller
                     $categoryIds = Product::whereIn('id', $wishlistProductIds)
                         ->whereNotNull('category_id')
                         ->pluck('category_id');
-
-                    $brandIds = Product::whereIn('id', $wishlistProductIds)
-                        ->whereNotNull('brand_id')
-                        ->pluck('brand_id');
                 }
             }
 
@@ -533,10 +522,6 @@ class ProductController extends Controller
 
             if (!empty($categoryIds)) {
                 $query->whereIn('category_id', $categoryIds);
-            }
-
-            if (!empty($brandIds)) {
-                $query->orWhereIn('brand_id', $brandIds);
             }
 
             $products = $query->limit(20)->get();
@@ -554,6 +539,68 @@ class ProductController extends Controller
             return $this->successResponse($products, 'Recommended products retrieved successfully.');
         } catch (\Exception $e) {
             return $this->serverErrorResponse('Failed to fetch recommended products: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Persist per-product variant overrides provided by the seller.
+     */
+    protected function syncProductVariantOptions(Product $product, array $variants): void
+    {
+        $category = $product->category ?? $product->category()->first();
+
+        if (!$category) {
+            $product->variantOptions()->delete();
+            return;
+        }
+
+        $allowedVariants = collect($category->aggregatedVariants())->keyBy('id');
+
+        $normalized = [];
+        foreach ($variants as $entry) {
+            $variantId = (int) ($entry['variant_id'] ?? 0);
+            if (!$variantId || !$allowedVariants->has($variantId)) {
+                continue;
+            }
+
+            $options = $entry['options'] ?? [];
+            if (!is_array($options)) {
+                continue;
+            }
+
+            $options = array_values(array_filter(array_map(function ($value) {
+                return is_string($value) ? trim($value) : '';
+            }, $options), fn($value) => $value !== ''));
+
+            if (empty($options)) {
+                continue;
+            }
+
+            $normalized[$variantId] = [
+                'options' => $options,
+                'is_required' => array_key_exists('is_required', $entry)
+                    ? (bool) $entry['is_required']
+                    : (bool) ($allowedVariants[$variantId]->is_required ?? true),
+            ];
+        }
+
+        if (empty($normalized)) {
+            $product->variantOptions()->delete();
+            return;
+        }
+
+        $product->variantOptions()
+            ->whereNotIn('variant_id', array_keys($normalized))
+            ->delete();
+
+        foreach ($normalized as $variantId => $data) {
+            $product->variantOptions()->updateOrCreate(
+                ['variant_id' => $variantId],
+                [
+                    'options' => $data['options'],
+                    'is_required' => $data['is_required'],
+                ]
+            );
         }
     }
 }

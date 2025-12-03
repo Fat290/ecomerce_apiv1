@@ -109,7 +109,6 @@ An e-commerce backend built on Laravel 12 that powers user accounts, shops, prod
   | `id` | big integer, PK |
   | `shop_id` | FK → `shops.id`, cascade delete |
   | `category_id` | FK → `categories.id`, cascade delete |
-  | `brand_id` | FK → `brands.id`, nullable, set null |
   | `name` | string |
   | `description` | text, nullable |
   | `images` | json, nullable |
@@ -1029,7 +1028,6 @@ List products with search, filters, and pagination.
 **Query Parameters:**
 - `search` - Search by name or description
 - `category_id` - Filter by category
-- `brand_id` - Filter by brand
 - `status` - Filter by status (sellers only)
 - `min_price` - Minimum price
 - `max_price` - Maximum price
@@ -1118,18 +1116,32 @@ Create a new product.
 
 **Headers:** `Authorization: Bearer <access_token>`
 
-**Request Body (multipart/form-data):**
+**Request Body (multipart/form-data or JSON):**
+```json
+{
+  "category_id": 1,
+  "brand_id": 1,
+  "name": "Laptop Pro",
+  "description": "High-performance laptop",
+  "price": 1299.99,
+  "stock": 50,
+  "status": "active",
+  "images[]": [<files or URLs>],
+  "variants": [
+    {
+      "variant_id": 12,
+      "options": ["XS", "S", "M", "L", "XL", "2XL"],
+      "is_required": true
+    },
+    {
+      "variant_id": 18,
+      "options": ["Red", "Green", "Navy"]
+    }
+  ]
+}
 ```
-name: Laptop Pro
-description: High-performance laptop
-price: 1299.99
-stock: 50
-category_id: 1
-brand_id: 1
-status: active
-images[]: [file1.jpg]
-images[]: [file2.jpg]
-```
+
+`variants` is optional. Each object must reference a category-defined `variant_id` (fetched via `/api/products/categories/{category}/variants`). Sellers can override the option list (e.g., add custom sizes or colors) per product; these overrides are stored in `product_variant_options`.
 
 **Response (201):**
 ```json
@@ -1144,6 +1156,20 @@ images[]: [file2.jpg]
     "stock": 50,
     "status": "active",
     "images": [ ... ],
+    "resolved_variants": [
+      {
+        "id": 12,
+        "name": "Size",
+        "options": ["XS", "S", "M", "L", "XL", "2XL"],
+        "is_required": true
+      },
+      {
+        "id": 18,
+        "name": "Color",
+        "options": ["Red", "Green", "Navy"],
+        "is_required": true
+      }
+    ],
     "category": { ... },
     "brand": { ... },
     "shop": { ... },
@@ -1151,6 +1177,8 @@ images[]: [file2.jpg]
   }
 }
 ```
+
+All product responses now include `resolved_variants`, which merges the category template with any seller overrides saved for that product.
 
 #### PUT/PATCH `/api/products/{id}`
 

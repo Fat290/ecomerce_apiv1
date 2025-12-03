@@ -24,7 +24,6 @@ class StoreProductRequest extends FormRequest
     {
         return [
             'category_id' => ['required', 'exists:categories,id'],
-            'brand_id' => ['nullable', 'exists:brands,id'],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'images' => ['nullable', 'array'],
@@ -34,6 +33,11 @@ class StoreProductRequest extends FormRequest
             'status' => ['nullable', 'string', Rule::in(['draft', 'active', 'out_of_stock', 'hidden', 'archived'])],
             'rating' => ['nullable', 'numeric', 'min:0', 'max:5'],
             'sold_count' => ['nullable', 'integer', 'min:0'],
+            'variants' => ['nullable', 'array'],
+            'variants.*.variant_id' => ['required', 'integer', 'exists:variant,id'],
+            'variants.*.options' => ['required', 'array', 'min:1'],
+            'variants.*.options.*' => ['required', 'string', 'max:255'],
+            'variants.*.is_required' => ['nullable', 'boolean'],
         ];
     }
 }

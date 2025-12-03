@@ -21,6 +21,10 @@
                 placeholder="Search by shop or owner"
                 class="border-2 border-gray-200 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
             >
+            <button id="refresh-button" class="inline-flex items-center px-3 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition">
+                <i class="fas fa-sync-alt mr-1"></i>
+                Refresh
+            </button>
         </div>
     </div>
 
@@ -101,6 +105,7 @@
     const nextBtn = document.getElementById('next-page');
     const statusFilter = document.getElementById('status-filter');
     const searchInput = document.getElementById('shop-search');
+    const refreshButton = document.getElementById('refresh-button');
 
     statusFilter.addEventListener('change', () => {
         state.status = statusFilter.value;
@@ -116,6 +121,10 @@
             state.page = 1;
             loadPendingShops();
         }, 300);
+    });
+
+    refreshButton.addEventListener('click', () => {
+        loadPendingShops(true);
     });
 
     prevBtn.addEventListener('click', () => {
@@ -212,14 +221,16 @@
         });
     }
 
-    async function loadPendingShops() {
-        tableBody.innerHTML = `
-            <tr>
-                <td colspan="6" class="px-6 py-4 text-center text-gray-500">
-                    Loading sellers...
-                </td>
-            </tr>
-        `;
+    async function loadPendingShops(force = false) {
+        if (!force) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                        Loading sellers...
+                    </td>
+                </tr>
+            `;
+        }
 
         try {
             const params = new URLSearchParams({

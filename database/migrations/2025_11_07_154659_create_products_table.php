@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->foreignId('shop_id')->constrained('shops')->onDelete('cascade');
             $table->foreignId('category_id')->constrained('categories')->onDelete('cascade');
-            $table->foreignId('brand_id')->nullable()->constrained('brands')->onDelete('set null');
             $table->string('name');
             $table->text('description')->nullable();
             $table->json('images')->nullable(); // Array of image URLs/IDs

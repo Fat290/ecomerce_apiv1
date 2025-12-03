@@ -24,7 +24,7 @@ class WishlistController extends Controller
             }
 
             $wishlistItems = Wishlist::where('user_id', $user->id)
-                ->with(['product.category', 'product.brand', 'product.shop'])
+                ->with(['product.category', 'product.shop'])
                 ->latest()
                 ->paginate(15);
 
@@ -76,7 +76,7 @@ class WishlistController extends Controller
                 'product_id' => $request->product_id,
             ]);
 
-            $wishlistItem->load(['product.category', 'product.brand', 'product.shop']);
+            $wishlistItem->load(['product.category', 'product.shop']);
 
             return $this->createdResponse($wishlistItem, 'Product added to wishlist successfully');
         } catch (\Exception $e) {

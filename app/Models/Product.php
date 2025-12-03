@@ -17,7 +17,6 @@ class Product extends Model
     protected $fillable = [
         'shop_id',
         'category_id',
-        'brand_id',
         'name',
         'description',
         'images',
@@ -33,6 +32,10 @@ class Product extends Model
      *
      * @return array<string, string>
      */
+    protected $appends = [
+        'resolved_variants',
+    ];
+
     protected function casts(): array
     {
         return [
@@ -59,14 +62,6 @@ class Product extends Model
     }
 
     /**
-     * Get the brand of the product.
-     */
-    public function brand()
-    {
-        return $this->belongsTo(Brand::class);
-    }
-
-    /**
      * Get the reviews for the product.
      */
     public function reviews()
@@ -80,5 +75,40 @@ class Product extends Model
     public function wishlists()
     {
         return $this->hasMany(Wishlist::class);
+    }
+
+    public function variantOptions()
+    {
+        return $this->hasMany(ProductVariantOption::class);
+    }
+
+    public function getResolvedVariantsAttribute(): array
+    {
+        $category = $this->relationLoaded('category')
+            ? $this->category
+            : $this->category()->first();
+
+        if (!$category) {
+            return [];
+        }
+
+        $categoryVariants = collect($category->aggregatedVariants());
+        $overrideCollection = $this->relationLoaded('variantOptions')
+            ? collect($this->variantOptions)
+            : $this->variantOptions()->get();
+
+        $overrides = $overrideCollection->keyBy('variant_id');
+
+        return $categoryVariants->map(function ($variant) use ($overrides) {
+            $data = $variant->toArray();
+
+            if ($overrides->has($variant->id)) {
+                $override = $overrides->get($variant->id);
+                $data['options'] = $override->options;
+                $data['is_required'] = $override->is_required;
+            }
+
+            return $data;
+        })->values()->all();
     }
 }

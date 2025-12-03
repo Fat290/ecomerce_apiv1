@@ -24,7 +24,7 @@ class CartController extends Controller
             }
 
             $cartItems = Cart::where('user_id', $user->id)
-                ->with(['product.category', 'product.brand', 'product.shop'])
+                ->with(['product.category', 'product.shop'])
                 ->latest()
                 ->get();
 
@@ -91,7 +91,7 @@ class CartController extends Controller
                 }
 
                 $cartItem->update(['quantity' => $newQuantity]);
-                $cartItem->load(['product.category', 'product.brand', 'product.shop']);
+                $cartItem->load(['product.category', 'product.shop']);
 
                 return $this->successResponse($cartItem, 'Cart item updated successfully');
             } else {
@@ -102,7 +102,7 @@ class CartController extends Controller
                     'quantity' => $request->quantity,
                 ]);
 
-                $cartItem->load(['product.category', 'product.brand', 'product.shop']);
+                $cartItem->load(['product.category', 'product.shop']);
 
                 return $this->createdResponse($cartItem, 'Product added to cart successfully');
             }
@@ -147,7 +147,7 @@ class CartController extends Controller
             }
 
             $cartItem->update(['quantity' => $request->quantity]);
-            $cartItem->load(['product.category', 'product.brand', 'product.shop']);
+            $cartItem->load(['product.category', 'product.shop']);
 
             return $this->successResponse($cartItem, 'Cart item updated successfully');
         } catch (\Exception $e) {
