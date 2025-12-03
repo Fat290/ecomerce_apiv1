@@ -136,7 +136,7 @@ class VoucherController extends Controller
             ->with('shop')
             ->first();
 
-        if (!$voucher || $voucher->shop->owner_id !== $seller->id) {
+        if (!$voucher || !$voucher->shop || $voucher->shop->owner_id !== $seller->id) {
             return $this->forbiddenResponse('You can only update vouchers for your own shops.');
         }
 

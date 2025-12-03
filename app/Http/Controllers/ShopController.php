@@ -260,6 +260,7 @@ class ShopController extends Controller
             }
 
             $shop->update($updateData);
+            $shop->refresh(); // Refresh to get updated status
 
             // When an admin activates a shop, promote the owner to seller
             $statusChangedByAdmin = $user->role === 'admin'

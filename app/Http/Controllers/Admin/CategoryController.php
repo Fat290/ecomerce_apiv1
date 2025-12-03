@@ -9,16 +9,38 @@ use App\Models\Category;
 use App\Traits\HandlesImageUploads;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class CategoryController extends Controller
 {
     use HandlesImageUploads;
 
     /**
+     * Ensure the authenticated user is an admin.
+     */
+    private function checkAdmin()
+    {
+        try {
+            $user = JWTAuth::parseToken()->authenticate();
+            if ($user && $user->role === 'admin') {
+                return $user;
+            }
+        } catch (\Exception $e) {
+            // fall through
+        }
+
+        return null;
+    }
+
+    /**
      * List categories with optional filters.
      */
     public function index(Request $request): JsonResponse
     {
+        if (!$this->checkAdmin()) {
+            return $this->forbiddenResponse('Only administrators can access this endpoint.');
+        }
+
         try {
             $query = Category::with(['parent', 'variants'])->orderBy('name');
 
@@ -55,6 +77,10 @@ class CategoryController extends Controller
      */
     public function store(StoreCategoryRequest $request): JsonResponse
     {
+        if (!$this->checkAdmin()) {
+            return $this->forbiddenResponse('Only administrators can create categories.');
+        }
+
         try {
             $data = $request->only(['name', 'parent_id']);
 
@@ -79,6 +105,10 @@ class CategoryController extends Controller
      */
     public function update(UpdateCategoryRequest $request, Category $category): JsonResponse
     {
+        if (!$this->checkAdmin()) {
+            return $this->forbiddenResponse('Only administrators can update categories.');
+        }
+
         try {
             $data = $request->only(['name', 'parent_id']);
 
@@ -109,6 +139,10 @@ class CategoryController extends Controller
      */
     public function destroy(Category $category): JsonResponse
     {
+        if (!$this->checkAdmin()) {
+            return $this->forbiddenResponse('Only administrators can delete categories.');
+        }
+
         try {
             if ($category->image) {
                 $this->deleteImage($category->image);

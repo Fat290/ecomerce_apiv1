@@ -133,10 +133,15 @@ class CartController extends Controller
 
             $cartItem = Cart::where('user_id', $user->id)
                 ->where('id', $id)
+                ->with('product')
                 ->first();
 
             if (!$cartItem) {
                 return $this->notFoundResponse('Cart item not found');
+            }
+
+            if (!$cartItem->product) {
+                return $this->errorResponse('Product associated with this cart item no longer exists', 400);
             }
 
             $product = $cartItem->product;

@@ -390,13 +390,12 @@ class ProductController extends Controller
 
             $product->update($updateData);
 
-            $product->refresh()->load('category');
-
             if ($request->has('variants')) {
                 $this->syncProductVariantOptions($product, $request->input('variants', []));
             }
 
-            // Load relationships for response
+            // Refresh and load relationships for response
+            $product->refresh();
             $product->load(['category.variants', 'shop', 'variantOptions.variant']);
 
             return $this->successResponse($product, 'Product updated successfully');
