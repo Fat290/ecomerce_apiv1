@@ -8,6 +8,7 @@ use App\Models\Shop;
 use App\Traits\HandlesImageUploads;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 class ShopController extends Controller
@@ -18,7 +19,7 @@ class ShopController extends Controller
      * For sellers: shows their own shop
      * For others: shows all active shops
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         try {
             $user = JWTAuth::parseToken()->authenticate();
@@ -27,10 +28,50 @@ class ShopController extends Controller
                 return $this->unauthorizedResponse('User not authenticated');
             }
 
-            // If user is a seller, show only their shop
-            if (in_array($user->role, ['seller', 'admin'])) {
+            // Admins: see all shops (including pending)
+            if ($user->role === 'admin') {
+                $query = Shop::with(['owner', 'businessType'])
+                    ->latest()
+                    ->when($request->filled('status'), function ($q) use ($request) {
+                        $q->where('status', $request->input('status'));
+                    })
+                    ->when($request->filled('search'), function ($q) use ($request) {
+                        $term = $request->input('search');
+                        $q->where(function ($sub) use ($term) {
+                            $sub->where('name', 'like', "%{$term}%")
+                                ->orWhereHas('owner', function ($ownerQuery) use ($term) {
+                                    $ownerQuery->where('name', 'like', "%{$term}%")
+                                        ->orWhere('email', 'like', "%{$term}%");
+                                });
+                        });
+                    });
+
+                $shops = $query->paginate(15);
+
+                $message = $request->filled('status')
+                    ? 'Shops retrieved successfully for status ' . $request->input('status')
+                    : 'All shops retrieved successfully';
+
+                $totals = Shop::selectRaw('status, COUNT(*) as aggregate')
+                    ->groupBy('status')
+                    ->pluck('aggregate', 'status')
+                    ->toArray();
+
+                return $this->paginatedResponse($shops, $message, [
+                    'meta' => [
+                        'totals' => [
+                            'pending' => $totals['pending'] ?? 0,
+                            'active' => $totals['active'] ?? 0,
+                            'banned' => $totals['banned'] ?? 0,
+                        ],
+                    ],
+                ]);
+            }
+
+            // Sellers: show only their shop
+            if ($user->role === 'seller') {
                 $shop = Shop::where('owner_id', $user->id)
-                    ->with(['owner', 'products'])
+                    ->with(['owner', 'products', 'businessType'])
                     ->first();
 
                 if ($shop) {
@@ -39,10 +80,20 @@ class ShopController extends Controller
                     return $this->notFoundResponse('You do not have a shop yet');
                 }
             } else {
-                // For buyers and public: show all active shops
+                // Buyers/others: show all active shops
                 $shops = Shop::where('status', 'active')
-                    ->with(['owner'])
+                    ->with(['owner', 'businessType'])
                     ->latest()
+                    ->when($request->filled('search'), function ($q) use ($request) {
+                        $term = $request->input('search');
+                        $q->where(function ($sub) use ($term) {
+                            $sub->where('name', 'like', "%{$term}%")
+                                ->orWhereHas('owner', function ($ownerQuery) use ($term) {
+                                    $ownerQuery->where('name', 'like', "%{$term}%")
+                                        ->orWhere('email', 'like', "%{$term}%");
+                                });
+                        });
+                    })
                     ->paginate(15);
 
                 return $this->paginatedResponse($shops, 'Shops retrieved successfully');
@@ -58,7 +109,7 @@ class ShopController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $shop = Shop::with(['owner', 'products'])
+            $shop = Shop::with(['owner', 'products', 'businessType'])
                 ->find($id);
 
             if (!$shop) {
@@ -114,7 +165,7 @@ class ShopController extends Controller
                 'logo' => $logoUrl,
                 'banner' => $bannerUrl,
                 'description' => $request->description,
-                'business_type' => $request->business_type,
+                'business_type_id' => $request->business_type_id->toInteger(),
                 'join_date' => $request->join_date ? Carbon::parse($request->join_date) : Carbon::now(),
                 'address' => $request->address,
                 'rating' => $request->rating ?? 0,
@@ -122,9 +173,9 @@ class ShopController extends Controller
             ]);
 
             // Load owner relationship for response
-            $shop->load('owner');
+            $shop->load(['owner', 'businessType']);
 
-            return $this->createdResponse($shop, 'Shop created successfully. Your account status has been set to pending for review.');
+            return $this->createdResponse($shop, 'Shop created successfully and is pending approval.');
         } catch (\Exception $e) {
             return $this->serverErrorResponse('Failed to create shop: ' . $e->getMessage());
         }
@@ -163,11 +214,13 @@ class ShopController extends Controller
             $updateData = $request->only([
                 'name',
                 'description',
-                'business_type',
+                'business_type_id',
                 'address',
                 'rating',
                 'status',
             ]);
+
+            $previousStatus = $shop->status;
 
             if ($request->filled('join_date')) {
                 $updateData['join_date'] = Carbon::parse($request->join_date);
@@ -196,8 +249,27 @@ class ShopController extends Controller
 
             $shop->update($updateData);
 
+            // When an admin activates a shop, promote the owner to seller
+            if (
+                $user->role === 'admin'
+                && array_key_exists('status', $updateData)
+                && $previousStatus !== 'active'
+                && $shop->status === 'active'
+            ) {
+                $owner = $shop->owner()->first();
+                if ($owner) {
+                    $ownerUpdate = ['status' => 'active'];
+
+                    if ($owner->role !== 'admin') {
+                        $ownerUpdate['role'] = 'seller';
+                    }
+
+                    $owner->update($ownerUpdate);
+                }
+            }
+
             // Load relationships for response
-            $shop->load(['owner', 'products']);
+            $shop->load(['owner', 'products', 'businessType']);
 
             return $this->successResponse($shop, 'Shop updated successfully');
         } catch (\Exception $e) {

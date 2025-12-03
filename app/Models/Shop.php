@@ -20,28 +20,12 @@ class Shop extends Model
         'logo',
         'banner',
         'description',
-        'business_type',
+        'business_type_id',
         'join_date',
         'address',
         'rating',
         'status',
     ];
-
-    /**
-     * Boot the model.
-     */
-    protected static function boot(): void
-    {
-        parent::boot();
-
-        // When a shop is created, set the owner's status to 'pending' for review
-        static::created(function (Shop $shop) {
-            $owner = $shop->owner;
-            if ($owner) {
-                $owner->update(['status' => 'pending']);
-            }
-        });
-    }
 
     /**
      * Get the attributes that should be cast.
@@ -70,6 +54,14 @@ class Shop extends Model
     public function products()
     {
         return $this->hasMany(Product::class);
+    }
+
+    /**
+     * Business type metadata.
+     */
+    public function businessType()
+    {
+        return $this->belongsTo(BusinessType::class);
     }
 
     /**

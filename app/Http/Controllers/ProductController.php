@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Product\StoreProductRequest;
 use App\Http\Requests\Product\UpdateProductRequest;
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\Shop;
 use App\Models\Order;
@@ -106,7 +107,7 @@ class ProductController extends Controller
             $query->orderBy($sortBy, $sortOrder);
 
             // Load relationships
-            $query->with(['category', 'brand', 'shop']);
+            $query->with(['category.variants', 'brand', 'shop']);
 
             // Pagination
             $perPage = $request->input('per_page', 15);
@@ -191,7 +192,7 @@ class ProductController extends Controller
             ]);
 
             // Load relationships for response
-            $product->load(['category', 'brand', 'shop']);
+            $product->load(['category.variants', 'brand', 'shop']);
 
             return $this->createdResponse($product, 'Product created successfully');
         } catch (\Exception $e) {
@@ -246,7 +247,7 @@ class ProductController extends Controller
             }
 
             $query->orderBy($sortBy, $sortOrder)
-                ->with(['category', 'brand', 'shop']);
+                ->with(['category.variants', 'brand', 'shop']);
 
             $perPage = min(max(1, (int) $request->input('per_page', 20)), 100);
             $products = $query->paginate($perPage);
@@ -264,25 +265,27 @@ class ProductController extends Controller
     {
         $request->validate([
             'q' => ['required', 'string'],
-            'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'], // backwards compatibility
+            'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
         try {
             $term = $request->input('q');
-            $limit = (int) $request->input('limit', 20);
+            $perPage = (int) ($request->input('per_page', $request->input('limit', 20)));
+            $perPage = min(max($perPage, 1), 100);
 
             $products = Product::whereIn('status', ['active', 'out_of_stock'])
                 ->where(function ($q) use ($term) {
                     $q->where('name', 'like', "%{$term}%")
                         ->orWhere('description', 'like', "%{$term}%");
                 })
-                ->with(['category', 'brand', 'shop'])
+                ->with(['category.variants', 'brand', 'shop'])
                 ->orderByDesc('sold_count')
                 ->orderByDesc('rating')
-                ->limit($limit)
-                ->get();
+                ->paginate($perPage);
 
-            return $this->successResponse($products, 'Search results retrieved successfully.');
+            return $this->paginatedResponse($products, 'Search results retrieved successfully.');
         } catch (\Exception $e) {
             return $this->serverErrorResponse('Failed to search products: ' . $e->getMessage());
         }
@@ -295,7 +298,7 @@ class ProductController extends Controller
     public function show(string $id): JsonResponse
     {
         try {
-            $product = Product::with(['category', 'brand', 'shop', 'reviews'])
+            $product = Product::with(['category.variants', 'brand', 'shop', 'reviews'])
                 ->find($id);
 
             if (!$product) {
@@ -396,7 +399,7 @@ class ProductController extends Controller
             $product->update($updateData);
 
             // Load relationships for response
-            $product->load(['category', 'brand', 'shop']);
+            $product->load(['category.variants', 'brand', 'shop']);
 
             return $this->successResponse($product, 'Product updated successfully');
         } catch (\Exception $e) {
@@ -443,6 +446,21 @@ class ProductController extends Controller
             return $this->successResponse(null, 'Product deleted successfully');
         } catch (\Exception $e) {
             return $this->serverErrorResponse('Failed to delete product: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Return variant definitions for the provided category to assist product creation.
+     */
+    public function categoryVariants(Category $category): JsonResponse
+    {
+        try {
+            return $this->successResponse([
+                'category' => $category->load('parent'),
+                'variants' => $category->aggregatedVariants(),
+            ], 'Category variants retrieved successfully.');
+        } catch (\Exception $e) {
+            return $this->serverErrorResponse('Failed to load category variants: ' . $e->getMessage());
         }
     }
 

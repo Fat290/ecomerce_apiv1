@@ -48,4 +48,20 @@ class AdminViewController extends Controller
     {
         return view('admin.vouchers');
     }
+
+    /**
+     * Show the pending seller approvals page.
+     */
+    public function pendingShops()
+    {
+        return view('admin.pending-shops');
+    }
+
+    /**
+     * Show the category management page.
+     */
+    public function categories()
+    {
+        return view('admin.categories');
+    }
 }

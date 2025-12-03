@@ -1,16 +1,19 @@
 <?php
 
-use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Admin\BannerController as AdminBannerController;
+use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
+use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Admin\VoucherController as AdminVoucherController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BannerController;
-use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\BusinessTypeController;
 use App\Http\Controllers\CartController;
-use App\Http\Controllers\Seller\VoucherController as SellerVoucherController;
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\Seller\VoucherController as SellerVoucherController;
 use App\Http\Controllers\ShopController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WishlistController;
@@ -62,13 +65,17 @@ Route::prefix('catalog')->group(function () {
     // Public product list and search
     Route::get('/products', [ProductController::class, 'publicIndex']);
     Route::get('/products/search', [ProductController::class, 'publicSearch']);
+    // Public product detail (no authentication required)
+    Route::get('/products/{id}', [ProductController::class, 'show']);
 });
 
-// Public product detail (no authentication required)
-Route::get('/products/{id}', [ProductController::class, 'show']);
+
 
 // Public banners for the app (no authentication required)
 Route::get('/banners', [BannerController::class, 'index']);
+Route::get('/business-types', [BusinessTypeController::class, 'index']);
+Route::get('/categories', [CategoryController::class, 'index']);
+Route::get('/categories/{category}/variants', [CategoryController::class, 'variants']);
 
 /*
 |--------------------------------------------------------------------------
@@ -98,6 +105,7 @@ Route::middleware('auth:api')->group(function () {
     // Product routes (require authentication)
     Route::get('/products', [ProductController::class, 'index']);
     Route::post('/products', [ProductController::class, 'store']);
+    Route::get('/products/categories/{category}/variants', [ProductController::class, 'categoryVariants']);
     Route::put('/products/{id}', [ProductController::class, 'update']);
     Route::patch('/products/{id}', [ProductController::class, 'update']);
     Route::delete('/products/{id}', [ProductController::class, 'destroy']);
@@ -167,6 +175,13 @@ Route::middleware('auth:api')->group(function () {
         Route::put('/vouchers/{id}', [AdminVoucherController::class, 'update']);
         Route::patch('/vouchers/{id}', [AdminVoucherController::class, 'update']);
         Route::delete('/vouchers/{id}', [AdminVoucherController::class, 'destroy']);
+
+        // Category management (admin)
+        Route::get('/categories', [AdminCategoryController::class, 'index']);
+        Route::post('/categories', [AdminCategoryController::class, 'store']);
+        Route::put('/categories/{category}', [AdminCategoryController::class, 'update']);
+        Route::patch('/categories/{category}', [AdminCategoryController::class, 'update']);
+        Route::delete('/categories/{category}', [AdminCategoryController::class, 'destroy']);
     });
 
     // Seller routes

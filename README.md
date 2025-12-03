@@ -49,6 +49,16 @@ An e-commerce backend built on Laravel 12 that powers user accounts, shops, prod
   | `remember_token` | string, nullable |
   | Timestamps | `created_at`, `updated_at` |
 
+  ### `business_types`
+  | Column | Type / Constraints | Notes |
+  |--------|--------------------|-------|
+  | `id` | big integer, PK |
+  | `name` | string, unique |
+  | `slug` | string, unique |
+  | `description` | text, nullable |
+  | `is_active` | boolean, default true |
+  | Timestamps | `created_at`, `updated_at` |
+
   ### `shops`
   | Column | Type / Constraints | Notes |
   |--------|--------------------|-------|
@@ -58,7 +68,7 @@ An e-commerce backend built on Laravel 12 that powers user accounts, shops, prod
   | `logo` | string, nullable |
   | `banner` | string, nullable |
   | `description` | text, nullable |
-  | `business_type` | string, nullable |
+  | `business_type_id` | FK → `business_types.id`, nullable, null on delete |
   | `join_date` | date, nullable |
   | `address` | string, nullable |
   | `rating` | decimal(3,2), default 0 |
@@ -70,7 +80,20 @@ An e-commerce backend built on Laravel 12 that powers user accounts, shops, prod
   |--------|--------------------|-------|
   | `id` | big integer, PK |
   | `name` | string |
+  | `image` | string, nullable |
   | `parent_id` | self FK, nullable, cascade delete |
+  | Timestamps | `created_at`, `updated_at` |
+
+  ### `variant`
+  | Column | Type / Constraints | Notes |
+  |--------|--------------------|-------|
+  | `id` | big integer, PK |
+  | `category_id` | FK → `categories.id`, cascade delete |
+  | `name` | string |
+  | `options` | json (array of option strings), nullable |
+  | `is_required` | boolean, default false |
+  | `position` | unsigned integer, default 0 |
+  | Unique | (`category_id`, `name`) |
   | Timestamps | `created_at`, `updated_at` |
 
   ### `brands`
@@ -758,7 +781,7 @@ Create a new shop.
 ```json
 {
   "success": true,
-  "message": "Shop created successfully. Your account status has been set to pending for review.",
+  "message": "Shop created successfully and is pending approval.",
   "data": {
     "id": 1,
     "name": "My New Shop",

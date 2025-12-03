@@ -352,6 +352,14 @@
                         <i class="nav-item-icon fas fa-ticket-alt w-5 text-center mr-3 text-lg"></i>
                         <span class="sidebar-text nav-item-text font-medium">Vouchers</span>
                     </a>
+                    <a href="/admin/categories" data-tooltip="Categories" class="nav-item {{ request()->is('admin/categories') ? 'active' : '' }} flex items-center px-4 py-3 rounded-lg transition-all duration-300 {{ request()->is('admin/categories') ? 'bg-gradient-to-r from-gray-700 to-gray-600 text-white shadow-lg' : 'text-gray-300 hover:bg-gray-700 hover:text-white hover:shadow-md' }}">
+                        <i class="nav-item-icon fas fa-layer-group w-5 text-center mr-3 text-lg"></i>
+                        <span class="sidebar-text nav-item-text font-medium">Categories</span>
+                    </a>
+                    <a href="/admin/pending-shops" data-tooltip="Pending Sellers" class="nav-item {{ request()->is('admin/pending-shops') ? 'active' : '' }} flex items-center px-4 py-3 rounded-lg transition-all duration-300 {{ request()->is('admin/pending-shops') ? 'bg-gradient-to-r from-gray-700 to-gray-600 text-white shadow-lg' : 'text-gray-300 hover:bg-gray-700 hover:text-white hover:shadow-md' }}">
+                        <i class="nav-item-icon fas fa-store w-5 text-center mr-3 text-lg"></i>
+                        <span class="sidebar-text nav-item-text font-medium">Pending Sellers</span>
+                    </a>
                 </nav>
 
                 <!-- Footer -->
