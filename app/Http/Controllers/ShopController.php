@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Shop\StoreShopRequest;
 use App\Http\Requests\Shop\UpdateShopRequest;
+use App\Models\Order;
+use App\Models\Product;
 use App\Models\Shop;
+use App\Models\ShopFollower;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Traits\HandlesImageUploads;
@@ -321,5 +324,111 @@ class ShopController extends Controller
             ],
             "/seller/shops/{$shop->id}"
         );
+    }
+
+    /**
+     * Return aggregated metrics for a shop (revenue, orders, followers, etc.).
+     */
+    public function stats(Request $request, string $id): JsonResponse
+    {
+        try {
+            $user = JWTAuth::parseToken()->authenticate();
+
+            if (!$user) {
+                return $this->unauthorizedResponse('User not authenticated');
+            }
+
+            $shop = Shop::find($id);
+
+            if (!$shop) {
+                return $this->notFoundResponse('Shop not found');
+            }
+
+            if ($user->role !== 'admin' && $shop->owner_id !== $user->id) {
+                return $this->forbiddenResponse('You do not have permission to view these statistics');
+            }
+
+            $fulfilledStatuses = ['confirmed', 'shipping', 'completed'];
+
+            $ordersByStatus = Order::selectRaw('status, COUNT(*) as total')
+                ->where('shop_id', $shop->id)
+                ->groupBy('status')
+                ->pluck('total', 'status')
+                ->toArray();
+
+            $ordersByStatus = array_map('intval', $ordersByStatus);
+            $totalOrders = array_sum($ordersByStatus);
+            $fulfilledOrdersCount = 0;
+
+            foreach ($fulfilledStatuses as $status) {
+                $fulfilledOrdersCount += $ordersByStatus[$status] ?? 0;
+            }
+
+            $revenueQuery = Order::where('shop_id', $shop->id)
+                ->whereIn('status', $fulfilledStatuses);
+
+            $totalRevenue = (clone $revenueQuery)->sum('total_amount');
+            $todayRevenue = (clone $revenueQuery)
+                ->whereDate('created_at', Carbon::today())
+                ->sum('total_amount');
+            $monthRevenue = (clone $revenueQuery)
+                ->whereBetween('created_at', [
+                    Carbon::now()->startOfMonth(),
+                    Carbon::now()->endOfMonth(),
+                ])
+                ->sum('total_amount');
+
+            $averageOrderValue = $fulfilledOrdersCount > 0
+                ? round($totalRevenue / $fulfilledOrdersCount, 2)
+                : 0;
+
+            $productsQuery = Product::where('shop_id', $shop->id);
+            $totalProducts = (clone $productsQuery)->count();
+            $activeProducts = (clone $productsQuery)->where('status', 'active')->count();
+            $outOfStockProducts = Product::where('shop_id', $shop->id)
+                ->where('status', 'out_of_stock')
+                ->count();
+
+            $followersCount = ShopFollower::where('shop_id', $shop->id)
+                ->distinct('user_id')
+                ->count('user_id');
+
+            $uniqueCustomers = Order::where('shop_id', $shop->id)
+                ->distinct('buyer_id')
+                ->count('buyer_id');
+
+            return $this->successResponse([
+                'shop' => [
+                    'id' => $shop->id,
+                    'name' => $shop->name,
+                    'status' => $shop->status,
+                    'rating' => (float) $shop->rating,
+                ],
+                'metrics' => [
+                    'revenue' => [
+                        'total' => (float) $totalRevenue,
+                        'today' => (float) $todayRevenue,
+                        'month_to_date' => (float) $monthRevenue,
+                        'average_order_value' => (float) $averageOrderValue,
+                    ],
+                    'orders' => [
+                        'total' => $totalOrders,
+                        'fulfilled' => $fulfilledOrdersCount,
+                        'pending' => $ordersByStatus['pending'] ?? 0,
+                        'cancelled' => $ordersByStatus['cancelled'] ?? 0,
+                        'breakdown' => $ordersByStatus,
+                    ],
+                    'products' => [
+                        'total' => $totalProducts,
+                        'active' => $activeProducts,
+                        'out_of_stock' => $outOfStockProducts,
+                    ],
+                    'followers' => $followersCount,
+                    'unique_customers' => $uniqueCustomers,
+                ],
+            ], 'Shop statistics retrieved successfully');
+        } catch (\Exception $e) {
+            return $this->serverErrorResponse('Failed to retrieve shop statistics: ' . $e->getMessage());
+        }
     }
 }

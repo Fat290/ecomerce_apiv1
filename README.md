@@ -733,6 +733,144 @@ List shops. Sellers see only their shop; buyers see all active shops.
 }
 ```
 
+#### GET `/api/shops/{id}/stats`
+
+Get revenue, orders, products, followers, and other KPIs for a shop. Only the shop owner (seller) and admins can access this endpoint.
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Shop statistics retrieved successfully",
+  "data": {
+    "shop": {
+      "id": 12,
+      "name": "Tech Store",
+      "status": "active",
+      "rating": 4.8
+    },
+    "metrics": {
+      "revenue": {
+        "total": 12500.45,
+        "today": 320.00,
+        "month_to_date": 2840.10,
+        "average_order_value": 78.12
+      },
+      "orders": {
+        "total": 160,
+        "fulfilled": 140,
+        "pending": 15,
+        "cancelled": 5,
+        "breakdown": {
+          "pending": 15,
+          "confirmed": 12,
+          "shipping": 18,
+          "completed": 110,
+          "cancelled": 5
+        }
+      },
+      "products": {
+        "total": 42,
+        "active": 35,
+        "out_of_stock": 4
+      },
+      "followers": 260,
+      "unique_customers": 120
+    }
+  }
+}
+```
+
+#### POST `/api/shops/{id}/follow`
+
+Follow an active shop (buyers only; sellers cannot follow their own shop).
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Response (201):**
+```json
+{
+  "success": true,
+  "message": "Shop followed successfully",
+  "data": null
+}
+```
+
+#### DELETE `/api/shops/{id}/follow`
+
+Unfollow a shop you currently follow.
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Shop unfollowed successfully",
+  "data": null
+}
+```
+
+#### GET `/api/shops/{id}/followers`
+
+List followers for a shop. Only the shop owner or an admin may access this endpoint.
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Shop followers retrieved successfully",
+  "data": [
+    {
+      "id": 12,
+      "shop_id": 5,
+      "user_id": 42,
+      "user": {
+        "id": 42,
+        "name": "Follower Name",
+        "email": "follower@example.com",
+        "avatar": "https://cdn.example.com/avatar.jpg"
+      },
+      "created_at": "2025-12-03T02:15:00.000000Z"
+    }
+  ],
+  "pagination": { "...": "..." }
+}
+```
+
+#### GET `/api/shops/following/me`
+
+Return the list of shops the current authenticated user follows.
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Followed shops retrieved successfully",
+  "data": [
+    {
+      "id": 56,
+      "shop_id": 12,
+      "user_id": 42,
+      "shop": {
+        "id": 12,
+        "name": "Tech Store",
+        "logo": "https://cdn.example.com/logo.jpg",
+        "banner": "https://cdn.example.com/banner.jpg",
+        "status": "active"
+      }
+    }
+  ],
+  "pagination": { "...": "..." }
+}
+```
+
 #### GET `/api/shops/{id}`
 
 Get specific shop details.
@@ -821,6 +959,62 @@ Update shop information.
   "data": { ... }  // Updated shop object
 }
 ```
+
+### Chat Routes
+
+#### GET `/api/chats`
+
+List chat threads for the authenticated user (either as buyer or as shop owner).
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Chats retrieved successfully",
+  "data": [
+    {
+      "id": 3,
+      "buyer_id": 42,
+      "seller_id": 12,
+      "messages": [
+        {
+          "sender_id": 42,
+          "sender_role": "buyer",
+          "body": "Hello, is this item in stock?",
+          "sent_at": "2025-12-03T03:01:05.000000Z"
+        }
+      ],
+      "last_message": "Hello, is this item in stock?",
+      "buyer": { "...": "..." },
+      "seller": { "...": "..." }
+    }
+  ],
+  "pagination": { "...": "..." }
+}
+```
+
+#### GET `/api/chats/{id}`
+
+Retrieve the full message history for a specific chat (participants only).
+
+#### POST `/api/shops/{shop_id}/chat/messages`
+
+Send the first message (or continue) to a shop. The shop must be active/open and cannot belong to the same user.
+
+**Body:**
+```json
+{
+  "message": "Hi! Can you confirm shipping time?"
+}
+```
+
+#### POST `/api/chats/{id}/messages`
+
+Reply inside an existing chat thread. Either the buyer or the shop owner can post messages using the same payload format as above.
+
+All chat endpoints require JWT authentication. Messages are stored in the `chats.messages` JSON column; real-time delivery is not required (messages are fetched when the client hits the APIs).
 
 ---
 

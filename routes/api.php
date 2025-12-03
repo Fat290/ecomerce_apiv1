@@ -16,6 +16,8 @@ use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\Seller\VoucherController as SellerVoucherController;
 use App\Http\Controllers\VoucherBrowseController;
 use App\Http\Controllers\ShopController;
+use App\Http\Controllers\ShopFollowerController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WishlistController;
 use Illuminate\Http\Request;
@@ -100,10 +102,21 @@ Route::middleware('auth:api')->group(function () {
 
     // Shop routes (require authentication)
     Route::get('/shops', [ShopController::class, 'index']);
+    Route::get('/shops/{id}/stats', [ShopController::class, 'stats']);
     Route::get('/shops/{id}', [ShopController::class, 'show']);
     Route::post('/shops', [ShopController::class, 'store']);
     Route::put('/shops/{id}', [ShopController::class, 'update']);
     Route::patch('/shops/{id}', [ShopController::class, 'update']);
+    Route::post('/shops/{id}/follow', [ShopFollowerController::class, 'follow']);
+    Route::delete('/shops/{id}/follow', [ShopFollowerController::class, 'unfollow']);
+    Route::get('/shops/{id}/followers', [ShopFollowerController::class, 'followers']);
+    Route::get('/shops/following/me', [ShopFollowerController::class, 'myFollows']);
+
+    // Chat routes
+    Route::get('/chats', [ChatController::class, 'index']);
+    Route::get('/chats/{chat}', [ChatController::class, 'show']);
+    Route::post('/shops/{shop}/chat/messages', [ChatController::class, 'messageShop']);
+    Route::post('/chats/{chat}/messages', [ChatController::class, 'reply']);
 
     // Product routes (require authentication)
     Route::get('/products', [ProductController::class, 'index']);
