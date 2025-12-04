@@ -82,6 +82,7 @@ Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/categories/{category}/variants', [CategoryController::class, 'variants']);
 Route::get('/vouchers/available', [VoucherBrowseController::class, 'available']);
 Route::get('/vouchers/claimable', [VoucherBrowseController::class, 'claimable']);
+Route::get('/vouchers/admin', [VoucherBrowseController::class, 'adminVouchers']);
 
 /*
 |--------------------------------------------------------------------------
