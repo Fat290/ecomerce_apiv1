@@ -252,6 +252,63 @@ class ProductController extends Controller
     }
 
     /**
+     * Public listing for products that already have at least one review.
+     */
+    public function reviewed(Request $request): JsonResponse
+    {
+        try {
+            $query = Product::whereIn('status', ['active', 'out_of_stock'])
+                ->whereHas('reviews')
+                ->withCount('reviews');
+
+            // Optional filters to keep parity with publicIndex
+            if ($request->filled('search')) {
+                $searchTerm = $request->input('search');
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('name', 'like', "%{$searchTerm}%")
+                        ->orWhere('description', 'like', "%{$searchTerm}%");
+                });
+            }
+
+            if ($request->filled('category_id')) {
+                $query->where('category_id', $request->input('category_id'));
+            }
+
+            if ($request->filled('shop_id')) {
+                $query->where('shop_id', $request->input('shop_id'));
+            }
+
+            if ($request->filled('min_price')) {
+                $query->where('price', '>=', $request->input('min_price'));
+            }
+            if ($request->filled('max_price')) {
+                $query->where('price', '<=', $request->input('max_price'));
+            }
+
+            if ($request->filled('min_rating')) {
+                $query->where('rating', '>=', $request->input('min_rating'));
+            }
+
+            $sortBy = $request->input('sort_by', 'rating');
+            $sortOrder = strtolower($request->input('sort_order', 'desc')) === 'asc' ? 'asc' : 'desc';
+            $allowedSortFields = ['created_at', 'price', 'rating', 'sold_count', 'name', 'reviews_count'];
+            if (!in_array($sortBy, $allowedSortFields)) {
+                $sortBy = 'rating';
+            }
+
+            $query->orderBy($sortBy, $sortOrder)
+                ->with(['category.variants', 'shop', 'variantOptions.variant']);
+
+            $perPage = min(max(1, (int) $request->input('per_page', 20)), 100);
+            $products = $query->paginate($perPage);
+
+            return $this->paginatedResponse($products, 'Reviewed products retrieved successfully');
+        } catch (\Exception $e) {
+            return $this->serverErrorResponse('Failed to retrieve reviewed products: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Public search endpoint (keyword-focused).
      */
     public function publicSearch(Request $request): JsonResponse

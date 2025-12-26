@@ -8,6 +8,7 @@ use App\Http\Requests\Review\UpdateReviewRequest;
 use App\Models\Product;
 use App\Models\Review;
 use App\Models\Shop;
+use App\Models\Order;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Tymon\JWTAuth\Facades\JWTAuth;
@@ -92,6 +93,21 @@ class ReviewController extends Controller
 
             if ($existingReview) {
                 return $this->errorResponse('You have already reviewed this product', 409);
+            }
+
+            // Ensure the user purchased this product before reviewing
+            $hasPurchased = Order::where('buyer_id', $user->id)
+                ->whereIn('status', ['confirmed', 'shipping', 'completed'])
+                ->where(function ($query) use ($product) {
+                    $query->whereRaw(
+                        "JSON_SEARCH(items, 'one', ?, NULL, '$[*].product_id') IS NOT NULL",
+                        [$product->id]
+                    );
+                })
+                ->exists();
+
+            if (!$hasPurchased) {
+                return $this->forbiddenResponse('You can only review products you have purchased');
             }
 
             // Create review

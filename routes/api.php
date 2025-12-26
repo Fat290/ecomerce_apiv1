@@ -67,6 +67,7 @@ Route::prefix('catalog')->group(function () {
     Route::get('/products/recommended', [ProductController::class, 'recommended']);
 
     // Public product list and search
+    Route::get('/products/reviewed', [ProductController::class, 'reviewed']);
     Route::get('/products', [ProductController::class, 'publicIndex']);
     Route::get('/products/search', [ProductController::class, 'publicSearch']);
     // Public product detail (no authentication required)
@@ -82,6 +83,9 @@ Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/categories/{category}/variants', [CategoryController::class, 'variants']);
 Route::get('/vouchers/available', [VoucherBrowseController::class, 'available']);
 Route::get('/vouchers/claimable', [VoucherBrowseController::class, 'claimable']);
+
+
+
 Route::get('/vouchers/admin', [VoucherBrowseController::class, 'adminVouchers']);
 
 /*
