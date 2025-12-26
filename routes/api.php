@@ -152,6 +152,7 @@ Route::middleware('auth:api')->group(function () {
     Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
     Route::patch('/orders/{id}/status', [OrderController::class, 'updateStatus']);
     Route::get('/shops/{shopId}/orders', [OrderController::class, 'shopOrders']);
+    Route::get('/orders/purchased-products', [OrderController::class, 'purchasedProducts']);
 
     // Wishlist routes (require authentication)
     Route::get('/wishlist', [WishlistController::class, 'index']);

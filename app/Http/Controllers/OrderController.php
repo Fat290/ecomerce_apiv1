@@ -7,6 +7,7 @@ use App\Models\Cart;
 use App\Models\Order;
 use App\Models\Shop;
 use App\Models\Voucher;
+use App\Models\Product;
 use App\Services\NotificationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -53,6 +54,82 @@ class OrderController extends Controller
             return $this->successResponse($orders, 'Orders retrieved successfully');
         } catch (\Exception $e) {
             return $this->serverErrorResponse('Failed to retrieve orders: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get products the authenticated buyer has purchased, with review status.
+     */
+    public function purchasedProducts(Request $request): JsonResponse
+    {
+        try {
+            $user = JWTAuth::parseToken()->authenticate();
+
+            if (!$user) {
+                return $this->unauthorizedResponse('User not authenticated');
+            }
+
+            // Default to statuses that indicate the order is sufficiently progressed for reviews
+            $defaultStatuses = ['confirmed', 'shipping', 'completed'];
+            $allowedStatuses = ['pending', 'confirmed', 'shipping', 'completed', 'cancelled'];
+            $statuses = $request->filled('statuses')
+                ? array_values(array_intersect(
+                    array_map('trim', explode(',', $request->input('statuses'))),
+                    $allowedStatuses
+                ))
+                : $defaultStatuses;
+
+            $orders = Order::where('buyer_id', $user->id)
+                ->when(!empty($statuses), fn($q) => $q->whereIn('status', $statuses))
+                ->get(['items']);
+
+            $productIds = $orders->flatMap(function ($order) {
+                if (!is_array($order->items)) {
+                    return [];
+                }
+                return collect($order->items)
+                    ->pluck('product_id')
+                    ->filter();
+            })->unique()->values();
+
+            if ($productIds->isEmpty()) {
+                return $this->paginatedResponse(
+                    collect([])->paginate(1),
+                    'Purchased products retrieved successfully'
+                );
+            }
+
+            $perPage = min(max(1, (int)$request->input('per_page', 20)), 100);
+            $reviewStatus = $request->input('review_status'); // reviewed | unreviewed | all
+
+            $productsQuery = Product::whereIn('id', $productIds)
+                ->whereIn('status', ['active', 'out_of_stock'])
+                ->with(['shop', 'category'])
+                ->withCount(['reviews as my_review_count' => function ($q) use ($user) {
+                    $q->where('buyer_id', $user->id);
+                }]);
+
+            if ($reviewStatus === 'reviewed') {
+                $productsQuery->whereHas('reviews', function ($q) use ($user) {
+                    $q->where('buyer_id', $user->id);
+                });
+            } elseif ($reviewStatus === 'unreviewed') {
+                $productsQuery->whereDoesntHave('reviews', function ($q) use ($user) {
+                    $q->where('buyer_id', $user->id);
+                });
+            }
+
+            $products = $productsQuery->paginate($perPage);
+
+            // Append a simple boolean flag for frontend consumption
+            $products->getCollection()->transform(function ($product) {
+                $product->reviewed_by_me = ($product->my_review_count ?? 0) > 0;
+                return $product;
+            });
+
+            return $this->paginatedResponse($products, 'Purchased products retrieved successfully');
+        } catch (\Exception $e) {
+            return $this->serverErrorResponse('Failed to retrieve purchased products: ' . $e->getMessage());
         }
     }
 
